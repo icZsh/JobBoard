@@ -13,7 +13,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - No authentication — local-only single-user app
 - Zod for import payload validation
 
-Once scaffolded, expected commands will be the standard Next.js/Prisma set (`npm run dev`, `npx prisma migrate dev`, etc.). Update this section with the actual commands when the scaffold lands.
+Current commands:
+
+- `npm run dev` — start the local Next.js dev server.
+- `npm run lint` — run ESLint.
+- `npm run typecheck` — run TypeScript without emitting files.
+- `npm run build` — create a production build.
+
+Prisma commands will be added when the database layer lands.
 
 ## Key Architectural Decisions
 
