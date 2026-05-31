@@ -1,6 +1,8 @@
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { JobStatus, type Priority } from "@/generated/prisma/client";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { JobStatus } from "@/generated/prisma/client";
 import {
   formatDateInput,
   formatDateOnly,
@@ -9,22 +11,26 @@ import {
   formatTimestamp,
 } from "@/lib/format";
 import { sanitizeJobDescription } from "@/lib/jobs/description";
-import { getLatestRecommendation, sortRecommendationsByLatest } from "@/lib/jobs/recommendations";
+import { isApplyTodayJob, isHighFit } from "@/lib/jobs/prioritization";
+import {
+  getLatestRecommendation,
+  sortRecommendationsByLatest,
+} from "@/lib/jobs/recommendations";
 import { jobStatusOptions } from "@/lib/jobs/tracking";
+import {
+  formatCompactSalary,
+  getFitTier,
+  priorityBadgeClass,
+  statusHueByStatus,
+} from "@/lib/jobs/view";
 import { prisma } from "@/lib/prisma";
-import { updateJobDetailTracking } from "./actions";
+import { getHighFitThreshold } from "@/lib/settings";
+import { TrackingForm } from "./tracking-form";
 
 export const dynamic = "force-dynamic";
 
 type JobDetailPageProps = {
   params: Promise<{ id: string }>;
-};
-
-const priorityStyles: Record<Priority, string> = {
-  LOW: "border-slate-200 bg-slate-50 text-slate-600",
-  MEDIUM: "border-sky-200 bg-sky-50 text-sky-700",
-  HIGH: "border-amber-200 bg-amber-50 text-amber-800",
-  URGENT: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
 async function getJob(id: string) {
@@ -41,329 +47,331 @@ async function getJob(id: string) {
   });
 }
 
-function Field({
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="paper-card">
+      <h2 className="paper-label mb-4 flex items-center gap-3">
+        {title}
+        <span className="h-px flex-1 bg-[var(--hair)]" />
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function MetadataCell({
   label,
   value,
+  mono,
 }: {
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
+  mono?: boolean;
 }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm text-slate-900">{value}</dd>
+      <p className="paper-label">{label}</p>
+      <p
+        className={`mt-1.5 text-sm text-[var(--ink)] ${
+          mono ? "font-mono" : ""
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
 
-function SkillList({ skills }: { skills: string[] }) {
-  if (skills.length === 0) {
-    return <span className="text-slate-500">None</span>;
-  }
-
+function SkillChips({
+  label,
+  skills,
+  missing,
+}: {
+  label: string;
+  skills: string[];
+  missing?: boolean;
+}) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {skills.map((skill) => (
-        <span
-          className="border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
-          key={skill}
-        >
-          {skill}
-        </span>
-      ))}
+    <div>
+      <h3 className="paper-label mb-2">{label}</h3>
+      {skills.length === 0 ? (
+        <p className="text-sm text-[var(--ink-faint)]">None</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {skills.map((skill) => (
+            <span
+              className={`paper-badge text-[11px] ${
+                missing ? "badge-pass" : "badge-apply"
+              }`}
+              key={skill}
+            >
+              {skill}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = await params;
-  const job = await getJob(id);
+  const [job, highFitThreshold] = await Promise.all([
+    getJob(id),
+    getHighFitThreshold(),
+  ]);
 
   if (!job) {
     notFound();
   }
 
   const tracking = job.tracking;
+  const status = tracking?.status ?? JobStatus.NEW;
+  const statusHue = statusHueByStatus[status];
   const latestRecommendation = getLatestRecommendation(job.recommendations);
   const recommendationHistory = sortRecommendationsByLatest(job.recommendations);
   const salary = formatSalary(job.salaryMin, job.salaryMax);
+  const compactSalary = formatCompactSalary(job.salaryMin, job.salaryMax);
+  const fitScore = latestRecommendation?.fitScore ?? null;
+  const fitTier = getFitTier(fitScore);
+  const highFit = isHighFit(fitScore, highFitThreshold);
+  const applyToday = latestRecommendation
+    ? isApplyTodayJob({
+        fitScore,
+        concerns: latestRecommendation.concerns,
+        status,
+        suggestedAction: latestRecommendation.suggestedAction,
+        highFitThreshold,
+      })
+    : false;
   const sanitizedDescription = job.description
     ? sanitizeJobDescription(job.description)
     : null;
+  const statusOptions = jobStatusOptions.map((value) => ({
+    value,
+    hue: statusHueByStatus[value],
+  }));
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-5 py-6">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase text-slate-500">
-              Job Detail
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+    <main className="paper-app">
+      <div className="paper-wrap paper-wrap-detail">
+        <Link className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ink-soft)] hover:text-[var(--accent-ink)]" href="/board">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Board
+        </Link>
+
+        <header className="mb-7 flex flex-col gap-7 border-b border-[var(--hair-strong)] pb-7 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="paper-eyebrow">Job Detail</p>
+            <h1 className="mt-3 text-[40px] font-extrabold leading-tight text-[var(--ink)] max-md:text-[30px]">
               {job.title}
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              {job.company}
-              {job.location ? ` · ${job.location}` : ""}
-              {job.remoteType ? ` · ${job.remoteType}` : ""}
+            <p className="mt-3 text-[15px] text-[var(--ink-soft)]">
+              <strong className="text-[var(--ink)]">{job.company}</strong>
+              {job.location ? (
+                <span className="text-[var(--ink-faint)]"> · {job.location}</span>
+              ) : null}
+              {job.remoteType ? (
+                <span className="text-[var(--ink-faint)]">
+                  {" "}
+                  · {job.remoteType}
+                </span>
+              ) : null}
             </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="paper-badge badge-neutral">
+                <span
+                  className="status-dot"
+                  style={{ "--status-hue": statusHue } as CSSProperties}
+                />
+                {formatStatusLabel(status)}
+              </span>
+              {applyToday ? (
+                <span className="paper-badge badge-apply">Apply Today</span>
+              ) : null}
+              {highFit ? (
+                <span className="paper-badge badge-fit">High Fit</span>
+              ) : null}
+              {latestRecommendation?.priority ? (
+                <span
+                  className={`paper-badge ${priorityBadgeClass(
+                    latestRecommendation.priority,
+                  )}`}
+                >
+                  {formatStatusLabel(latestRecommendation.priority)}
+                </span>
+              ) : null}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-              href="/today"
-            >
-              Today
-            </Link>
-            <Link
-              className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-              href="/board"
-            >
-              Board
-            </Link>
-            <Link
-              className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-              href="/settings"
-            >
-              Settings
-            </Link>
-            {job.sourceUrl ? (
-              <a
-                className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-                href={job.sourceUrl}
-                rel="noreferrer"
-                target="_blank"
+
+          <div className="paper-panel flex items-center gap-6 p-5">
+            <div className="flex flex-col items-center gap-2">
+              <div
+                className="fit-ring h-[84px] w-[84px]"
+                style={{ "--score": fitScore ?? 0 } as CSSProperties}
               >
-                Apply
-              </a>
-            ) : null}
+                <span className="text-[26px]">{fitScore ?? "-"}</span>
+              </div>
+              <p className="paper-label">Fit Score</p>
+            </div>
+            <span className="self-stretch border-l border-[var(--hair)]" />
+            <div>
+              <p className="paper-label">Compensation</p>
+              <p className="mt-2 whitespace-nowrap font-mono text-[19px] text-[var(--ink)]">
+                {compactSalary ?? "Not listed"}
+              </p>
+              <p className="mt-1 text-xs text-[var(--ink-soft)]">{fitTier}</p>
+            </div>
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="grid gap-6">
-            <section className="border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-950">
-                Listing
-              </h2>
-              <dl className="mt-4 grid gap-4 md:grid-cols-3">
-                <Field label="Salary" value={salary ?? "Not listed"} />
-                <Field
-                  label="Date Posted"
-                  value={job.datePosted ? formatDateOnly(job.datePosted) : "Unknown"}
-                />
-                <Field label="First Seen" value={formatTimestamp(job.createdAt)} />
-                <Field
-                  label="Last Imported"
-                  value={formatTimestamp(job.lastImportedAt)}
-                />
-                <Field
-                  label="Status Changed"
-                  value={
-                    tracking?.statusChangedAt
-                      ? formatTimestamp(tracking.statusChangedAt)
-                      : "Unknown"
-                  }
-                />
-                <Field
-                  label="Applied"
-                  value={
-                    tracking?.appliedAt ? formatDateOnly(tracking.appliedAt) : "No"
-                  }
-                />
-              </dl>
-            </section>
-
-            <section className="border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-950">
-                Recommendation
-              </h2>
+        <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_348px]">
+          <div className="flex min-w-0 flex-col gap-5">
+            <Section title="Why this matched">
               {latestRecommendation ? (
-                <div className="mt-4 grid gap-4">
-                  <div className="flex flex-wrap gap-2">
-                    <span className="border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700">
-                      Fit {latestRecommendation.fitScore ?? "Not scored"}
-                    </span>
-                    {latestRecommendation.priority ? (
-                      <span
-                        className={`border px-2 py-1 text-xs font-medium ${priorityStyles[latestRecommendation.priority]}`}
-                      >
-                        {latestRecommendation.priority}
-                      </span>
-                    ) : null}
+                <>
+                  <p className="text-[15px] leading-7 text-[var(--ink)]">
+                    {latestRecommendation.matchReason ??
+                      "No match reason was included for this recommendation."}
+                  </p>
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    <SkillChips
+                      label="Matched skills"
+                      skills={latestRecommendation.matchedSkills}
+                    />
+                    <SkillChips
+                      label="Gaps"
+                      missing
+                      skills={latestRecommendation.missingSkills}
+                    />
                   </div>
-                  <dl className="grid gap-4 md:grid-cols-2">
-                    <Field
-                      label="Suggested Action"
-                      value={latestRecommendation.suggestedAction ?? "None"}
-                    />
-                    <Field
-                      label="Match Reason"
-                      value={latestRecommendation.matchReason ?? "None"}
-                    />
-                    <Field
-                      label="Concerns"
-                      value={latestRecommendation.concerns ?? "None"}
-                    />
-                    <Field
-                      label="Run"
-                      value={formatDateOnly(latestRecommendation.importRun.runDate)}
-                    />
-                  </dl>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">
-                        Matched Skills
-                      </p>
-                      <div className="mt-2">
-                        <SkillList skills={latestRecommendation.matchedSkills} />
+                  {latestRecommendation.concerns ? (
+                    <div className="mt-5 flex gap-3 rounded-[var(--radius-ctl)] border border-[var(--high-border)] bg-[var(--high-bg)] p-4">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-[var(--high-ink)]" />
+                      <div>
+                        <p className="paper-label text-[var(--high-ink)]">
+                          Concerns
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-[#7a4e12]">
+                          {latestRecommendation.concerns}
+                        </p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-500">
-                        Missing Skills
-                      </p>
-                      <div className="mt-2">
-                        <SkillList skills={latestRecommendation.missingSkills} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  ) : null}
+                </>
               ) : (
-                <p className="mt-3 text-sm text-slate-600">
+                <p className="text-sm text-[var(--ink-soft)]">
                   No recommendation history found for this job.
                 </p>
               )}
-            </section>
+            </Section>
 
-            <section className="border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-950">
-                Description
-              </h2>
+            <Section title="Role details">
+              <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <MetadataCell label="Salary" mono value={salary ?? "Not listed"} />
+                <MetadataCell
+                  label="Remote"
+                  value={job.remoteType ?? job.location ?? "Unknown"}
+                />
+                <MetadataCell
+                  label="Date Posted"
+                  value={job.datePosted ? formatDateOnly(job.datePosted) : "Unknown"}
+                />
+                <MetadataCell
+                  label="First Seen"
+                  value={formatTimestamp(job.createdAt)}
+                />
+                <MetadataCell
+                  label="Last Imported"
+                  value={formatTimestamp(job.lastImportedAt)}
+                />
+                <MetadataCell
+                  label="Suggested Action"
+                  value={latestRecommendation?.suggestedAction ?? "None"}
+                />
+              </dl>
+            </Section>
+
+            <Section title="Description">
               {sanitizedDescription ? (
                 <div
-                  className="prose prose-sm mt-4 max-w-none text-slate-700"
+                  className="paper-prose"
                   dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
                 />
               ) : (
-                <p className="mt-3 text-sm text-slate-600">
+                <p className="text-sm text-[var(--ink-soft)]">
                   No description was imported for this job.
                 </p>
               )}
-            </section>
+            </Section>
 
-            <section className="border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-950">
-                Import History
-              </h2>
+            <Section title="Import history">
               {recommendationHistory.length > 0 ? (
-                <div className="mt-4 grid gap-3">
-                  {recommendationHistory.map((recommendation) => (
-                    <div
-                      className="border border-slate-100 bg-slate-50 p-3 text-sm"
-                      key={recommendation.id}
-                    >
-                      <p className="font-medium text-slate-900">
-                        {formatDateOnly(recommendation.importRun.runDate)}
-                        {recommendation.importRun.sourceName
-                          ? ` · ${recommendation.importRun.sourceName}`
-                          : ""}
-                      </p>
-                      <p className="mt-1 text-slate-600">
-                        Fit {recommendation.fitScore ?? "Not scored"}
-                        {recommendation.priority
-                          ? ` · ${recommendation.priority}`
-                          : ""}
-                      </p>
-                    </div>
-                  ))}
+                <div className="relative pl-6 before:absolute before:bottom-1 before:left-[5px] before:top-1 before:w-0.5 before:bg-[var(--hair)]">
+                  {recommendationHistory.map((recommendation, index) => {
+                    const previous = recommendationHistory[index + 1];
+                    const currentScore = recommendation.fitScore;
+                    const previousScore = previous?.fitScore;
+                    const delta =
+                      typeof currentScore === "number" &&
+                      typeof previousScore === "number"
+                        ? currentScore - previousScore
+                        : null;
+
+                    return (
+                      <div className="relative pb-5 last:pb-0" key={recommendation.id}>
+                        <span
+                          className={`absolute -left-6 top-1 h-3 w-3 rounded-full border-2 ${
+                            index === 0
+                              ? "border-[var(--accent)] bg-[var(--accent)]"
+                              : "border-[var(--hair-strong)] bg-[var(--surface)]"
+                          }`}
+                        />
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <p className="text-sm font-bold text-[var(--ink)]">
+                            {formatDateOnly(recommendation.importRun.runDate)}
+                          </p>
+                          <p className="font-mono text-[11px] text-[var(--ink-faint)]">
+                            {recommendation.importRun.sourceName ?? "Unknown source"}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--ink-soft)]">
+                          Fit {currentScore ?? "Not scored"}
+                          {delta === null ? "" : ` · ${delta >= 0 ? "+" : ""}${delta}`}
+                          {index === 0 ? " · current run" : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-slate-600">
+                <p className="text-sm text-[var(--ink-soft)]">
                   No import history is available.
                 </p>
               )}
-            </section>
+            </Section>
           </div>
 
-          <aside className="h-fit border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-950">
-              Tracking
-            </h2>
-            <form action={updateJobDetailTracking} className="mt-4 grid gap-4">
-              <input type="hidden" name="jobId" value={job.id} />
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Status</span>
-                <select
-                  className="h-10 border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                  defaultValue={tracking?.status ?? JobStatus.NEW}
-                  name="status"
-                >
-                  {jobStatusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {formatStatusLabel(status)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Notes</span>
-                <textarea
-                  className="min-h-28 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                  defaultValue={tracking?.notes ?? ""}
-                  name="notes"
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Next Action</span>
-                <input
-                  className="h-10 border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                  defaultValue={tracking?.nextAction ?? ""}
-                  name="nextAction"
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Next Action Date</span>
-                <input
-                  className="h-10 border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                  defaultValue={formatDateInput(tracking?.nextActionDate)}
-                  name="nextActionDate"
-                  type="date"
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Applied Date</span>
-                <input
-                  className="h-10 border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                  defaultValue={formatDateInput(tracking?.appliedAt)}
-                  name="appliedAt"
-                  type="date"
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Resume Path</span>
-                <input
-                  className="h-10 border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                  defaultValue={tracking?.resumePath ?? ""}
-                  name="resumePath"
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="font-medium text-slate-700">Resume Version</span>
-                <input
-                  className="h-10 border border-slate-200 bg-white px-3 text-sm text-slate-900"
-                  defaultValue={tracking?.resumeVersion ?? ""}
-                  name="resumeVersion"
-                />
-              </label>
-              <button
-                className="h-10 border border-slate-900 bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800"
-                type="submit"
-              >
-                Save Tracking
-              </button>
-            </form>
-          </aside>
+          <TrackingForm
+            initial={{
+              status,
+              notes: tracking?.notes ?? "",
+              nextAction: tracking?.nextAction ?? "",
+              nextActionDate: formatDateInput(tracking?.nextActionDate),
+              appliedAt: formatDateInput(tracking?.appliedAt),
+              resumePath: tracking?.resumePath ?? "",
+              resumeVersion: tracking?.resumeVersion ?? "",
+            }}
+            jobId={job.id}
+            sourceUrl={job.sourceUrl}
+            statusOptions={statusOptions}
+          />
         </section>
       </div>
     </main>
