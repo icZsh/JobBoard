@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ImportRunStatus, JobStatus, type Priority } from "@/generated/prisma/client";
+import { formatDateOnly, formatSalary, formatStatusLabel, formatTimestamp } from "@/lib/format";
 import { isApplyTodayJob, isHighFit } from "@/lib/jobs/prioritization";
 import { prisma } from "@/lib/prisma";
 import { getHighFitThreshold } from "@/lib/settings";
@@ -39,47 +40,6 @@ const priorityStyles: Record<Priority, string> = {
 
 function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function formatRunDate(value: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(value);
-}
-
-function formatTimestamp(value: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(value);
-}
-
-function formatSalary(min: number | null, max: number | null) {
-  const formatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-
-  if (min && max) {
-    return `${formatter.format(min)} - ${formatter.format(max)}`;
-  }
-
-  if (min) {
-    return `${formatter.format(min)}+`;
-  }
-
-  if (max) {
-    return `Up to ${formatter.format(max)}`;
-  }
-
-  return null;
 }
 
 function buildTodayHref(input: { includeHidden?: boolean; runId?: string }) {
@@ -185,7 +145,7 @@ function sortRecommendations(
 function StatusBadge({ status }: { status: string }) {
   return (
     <span className="inline-flex items-center border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
-      {status.replaceAll("_", " ")}
+      {formatStatusLabel(status)}
     </span>
   );
 }
@@ -327,7 +287,7 @@ function JobCard({
             Date Posted
           </dt>
           <dd className="mt-1 text-slate-900">
-            {job.datePosted ? formatRunDate(job.datePosted) : "Unknown"}
+            {job.datePosted ? formatDateOnly(job.datePosted) : "Unknown"}
           </dd>
         </div>
       </dl>
@@ -448,7 +408,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             </h1>
             <p className="mt-2 text-sm text-slate-600">
               {selectedRun
-                ? `${formatRunDate(selectedRun.runDate)} · ${selectedRun.sourceName ?? "Unknown source"} · imported ${formatTimestamp(selectedRun.createdAt)}`
+                ? `${formatDateOnly(selectedRun.runDate)} · ${selectedRun.sourceName ?? "Unknown source"} · imported ${formatTimestamp(selectedRun.createdAt)}`
                 : "Latest recommendations will appear here after an import."}
             </p>
           </div>

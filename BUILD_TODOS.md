@@ -16,7 +16,7 @@ This project will be built in gated steps. After each item is completed, pause a
 3. [x] Add Prisma/Postgres schema and seed settings.
 4. [x] Implement import validation, dedupe helpers, and import API.
 5. [x] Build Today view with status quick actions.
-6. [ ] Build tracking update flow, Board, and Job Detail.
+6. [x] Build tracking update flow, Board, and Job Detail.
 7. [ ] Build Import, Settings, and Export flows.
 8. [ ] Add focused tests and run verification.
 

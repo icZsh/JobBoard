@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { JobStatus, type JobStatus as JobStatusValue } from "@/generated/prisma/client";
-import { prisma } from "@/lib/prisma";
+import { updateJobTracking } from "@/lib/jobs/tracking";
 
 const quickActionStatuses = new Set<string>([
   JobStatus.INTERESTED,
@@ -36,27 +36,7 @@ export async function updateTodayJobStatus(formData: FormData) {
     throw new Error("Invalid status update request.");
   }
 
-  const existingTracking = await prisma.jobTracking.findUnique({
-    where: { jobId },
-  });
-
-  if (!existingTracking) {
-    throw new Error("Tracking row not found for job.");
-  }
-
-  const now = new Date();
-
-  await prisma.jobTracking.update({
-    where: { jobId },
-    data: {
-      status,
-      statusChangedAt: now,
-      appliedAt:
-        status === JobStatus.APPLIED && !existingTracking.appliedAt
-          ? now
-          : undefined,
-    },
-  });
+  await updateJobTracking(jobId, { status });
 
   revalidatePath("/today");
   redirect(getRedirectTarget(formData));
