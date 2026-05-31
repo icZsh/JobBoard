@@ -6,6 +6,7 @@ import {
   type DedupeInfo,
 } from "./dedupe";
 import {
+  importJobSchema,
   formatZodError,
   importPayloadSchema,
   minimumImportEnvelopeSchema,
@@ -21,6 +22,12 @@ type PreparedImportJob = {
   raw: unknown;
   dedupe: DedupeInfo;
 };
+
+type PreviewImportJob = PreparedImportJob & {
+  index: number;
+};
+
+type ImportPreviewRow = ImportPreviewResult["rows"][number];
 
 export type ImportJobsResult =
   | {
@@ -43,6 +50,32 @@ export type ImportJobsResult =
       validationErrors?: string[];
     };
 
+export type ImportPreviewResult = {
+  ok: true;
+  canImport: boolean;
+  runDate: string;
+  sourceName: string | null;
+  totalJobs: number;
+  validJobs: number;
+  invalidJobs: number;
+  inPayloadDuplicates: number;
+  wouldImportJobs: number;
+  newJobs: number;
+  duplicateJobs: number;
+  validationErrors: { path: string; message: string }[];
+  rows: {
+    index: number;
+    title: string | null;
+    company: string | null;
+    sourceUrl: string | null;
+    fitScore: number | null;
+    duplicateInPayload: boolean;
+    existingJobId: string | null;
+    wouldCreate: boolean | null;
+    errors: string[];
+  }[];
+};
+
 export class MinimumEnvelopeError extends Error {
   constructor(message: string) {
     super(message);
@@ -61,6 +94,47 @@ function getRawJobs(payload: unknown) {
   }
 
   return [];
+}
+
+function getSourceName(payload: unknown) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "source_name" in payload
+  ) {
+    const sourceNameValue = (payload as Record<string, unknown>).source_name;
+
+    if (typeof sourceNameValue !== "string") {
+      return null;
+    }
+
+    const sourceName = sourceNameValue.trim();
+    return sourceName.length > 0 ? sourceName : null;
+  }
+
+  return null;
+}
+
+function getRawStringField(raw: unknown, key: string) {
+  if (raw && typeof raw === "object" && key in raw) {
+    const value = (raw as Record<string, unknown>)[key];
+    return typeof value === "string" ? value : null;
+  }
+
+  return null;
+}
+
+function getRawNumberField(raw: unknown, key: string) {
+  if (raw && typeof raw === "object" && key in raw) {
+    const value = (raw as Record<string, unknown>)[key];
+    return typeof value === "number" ? value : null;
+  }
+
+  return null;
+}
+
+function formatIssuePath(path: PropertyKey[]) {
+  return path.length > 0 ? path.join(".") : "payload";
 }
 
 function prepareJobs(payload: unknown) {
@@ -237,6 +311,133 @@ async function processImportRun(
   }
 
   return { createdJobs, updatedJobs, recommendationsCreated };
+}
+
+export async function previewImportPayload(
+  payload: unknown,
+  db: PrismaClientLike = defaultPrisma,
+): Promise<ImportPreviewResult> {
+  const envelope = minimumImportEnvelopeSchema.safeParse(payload);
+
+  if (!envelope.success) {
+    throw new MinimumEnvelopeError(formatZodError(envelope.error));
+  }
+
+  const rawJobs = getRawJobs(payload);
+  const fullPayload = importPayloadSchema.safeParse(payload);
+  const validationErrors = fullPayload.success
+    ? []
+    : fullPayload.error.issues.map((issue) => ({
+        path: formatIssuePath(issue.path),
+        message: issue.message,
+      }));
+  const prepared: PreviewImportJob[] = [];
+  const rows: ImportPreviewRow[] = rawJobs.map((raw, index) => {
+    const parsed = importJobSchema.safeParse(raw);
+    const baseRow: ImportPreviewRow = {
+      index: index + 1,
+      title: getRawStringField(raw, "title"),
+      company: getRawStringField(raw, "company"),
+      sourceUrl: getRawStringField(raw, "source_url"),
+      fitScore: getRawNumberField(raw, "fit_score"),
+      duplicateInPayload: false,
+      existingJobId: null,
+      wouldCreate: null,
+      errors: [] as string[],
+    };
+
+    if (!parsed.success) {
+      return {
+        ...baseRow,
+        errors: parsed.error.issues.map(
+          (issue) => `${formatIssuePath(issue.path)}: ${issue.message}`,
+        ),
+      };
+    }
+
+    const dedupe = buildDedupeInfo({
+      company: parsed.data.company,
+      title: parsed.data.title,
+      location: parsed.data.location,
+      sourceUrl: parsed.data.source_url,
+    });
+
+    prepared.push({
+      index,
+      data: parsed.data,
+      raw,
+      dedupe,
+    });
+
+    return {
+      ...baseRow,
+      title: parsed.data.title,
+      company: parsed.data.company,
+      sourceUrl: parsed.data.source_url ?? null,
+      fitScore: parsed.data.fit_score ?? null,
+      errors: [],
+    };
+  });
+
+  const deduped = dedupeIncomingJobs(prepared);
+  const dedupedIndexes = new Set(deduped.map((job) => job.index));
+
+  for (const job of prepared) {
+    if (!dedupedIndexes.has(job.index)) {
+      rows[job.index].duplicateInPayload = true;
+      rows[job.index].wouldCreate = false;
+    }
+  }
+
+  const existingMatches = await db.$transaction(async (tx) => {
+    const matches = new Map<number, string | null>();
+    const urlFallbackKeysSeenInThisRun = new Set<string>();
+
+    for (const job of deduped) {
+      const allowFallbackMatch =
+        !job.dedupe.urlKey ||
+        !urlFallbackKeysSeenInThisRun.has(job.dedupe.fallbackKey);
+      const existingJob = await findExistingJob(tx, job.dedupe, {
+        allowFallbackMatch,
+      });
+
+      matches.set(job.index, existingJob?.id ?? null);
+
+      if (job.dedupe.urlKey) {
+        urlFallbackKeysSeenInThisRun.add(job.dedupe.fallbackKey);
+      }
+    }
+
+    return matches;
+  });
+
+  let duplicateJobs = 0;
+
+  for (const job of deduped) {
+    const existingJobId = existingMatches.get(job.index) ?? null;
+    rows[job.index].existingJobId = existingJobId;
+    rows[job.index].wouldCreate = !existingJobId;
+
+    if (existingJobId) {
+      duplicateJobs += 1;
+    }
+  }
+
+  return {
+    ok: true,
+    canImport: fullPayload.success,
+    runDate: envelope.data.run_date,
+    sourceName: getSourceName(payload),
+    totalJobs: rawJobs.length,
+    validJobs: prepared.length,
+    invalidJobs: rows.filter((row) => row.errors.length > 0).length,
+    inPayloadDuplicates: prepared.length - deduped.length,
+    wouldImportJobs: deduped.length,
+    newJobs: deduped.length - duplicateJobs,
+    duplicateJobs,
+    validationErrors,
+    rows,
+  };
 }
 
 export async function importJobsPayload(

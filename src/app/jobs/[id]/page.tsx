@@ -121,6 +121,12 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
             >
               Board
             </Link>
+            <Link
+              className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+              href="/settings"
+            >
+              Settings
+            </Link>
             {job.sourceUrl ? (
               <a
                 className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
