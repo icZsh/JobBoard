@@ -97,7 +97,7 @@ function BoardCard({ job }: { job: BoardJob }) {
             rel="noreferrer"
             target="_blank"
           >
-            Source
+            Apply
           </a>
         ) : null}
       </div>

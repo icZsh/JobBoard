@@ -333,7 +333,7 @@ function JobCard({
               rel="noreferrer"
               target="_blank"
             >
-              Source
+              Apply
             </a>
           ) : null}
         </div>

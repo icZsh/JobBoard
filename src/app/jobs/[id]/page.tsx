@@ -134,7 +134,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 rel="noreferrer"
                 target="_blank"
               >
-                Source
+                Apply
               </a>
             ) : null}
           </div>
