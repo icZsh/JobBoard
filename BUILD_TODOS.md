@@ -11,7 +11,7 @@ This project will be built in gated steps. After each item is completed, pause a
 
 ## Items
 
-1. [ ] Initialize git repo and create build todo tracker.
+1. [x] Initialize git repo and create build todo tracker.
 2. [ ] Scaffold Next.js app and base tooling.
 3. [ ] Add Prisma/Postgres schema and seed settings.
 4. [ ] Implement import validation, dedupe helpers, and import API.
