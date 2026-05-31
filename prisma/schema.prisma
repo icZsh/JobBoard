@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ImportRun {
+  id           String          @id @default(cuid())
+  runDate      DateTime        @map("run_date") @db.Date
+  sourceName   String?         @map("source_name")
+  status       ImportRunStatus @default(PENDING)
+  rawPayload   Json            @map("raw_payload")
+  errorMessage String?         @map("error_message")
+  notes        String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  recommendations JobRecommendation[]
+
+  @@index([runDate, createdAt])
+  @@map("import_runs")
+}
+
+model Job {
+  id                  String    @id @default(cuid())
+  title               String
+  company             String
+  location            String?
+  remoteType          String?   @map("remote_type")
+  salaryMin           Int?      @map("salary_min")
+  salaryMax           Int?      @map("salary_max")
+  description         String?
+  sourceUrl           String?   @map("source_url")
+  normalizedSourceUrl String?   @map("normalized_source_url")
+  datePosted          DateTime? @map("date_posted")
+  dedupeKey           String    @unique @map("dedupe_key")
+  fallbackDedupeKey   String    @map("fallback_dedupe_key")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  lastImportedAt      DateTime  @default(now()) @map("last_imported_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  recommendations JobRecommendation[]
+  tracking        JobTracking?
+
+  @@index([normalizedSourceUrl])
+  @@index([fallbackDedupeKey])
+  @@index([company, title])
+  @@map("jobs")
+}
+
+model JobRecommendation {
+  id                String    @id @default(cuid())
+  jobId             String    @map("job_id")
+  importRunId       String    @map("import_run_id")
+  fitScore          Int?      @map("fit_score")
+  priority          Priority?
+  matchedSkills     String[]  @map("matched_skills")
+  missingSkills     String[]  @map("missing_skills")
+  matchReason       String?   @map("match_reason")
+  concerns          String?
+  suggestedAction   String?   @map("suggested_action")
+  rawRecommendation Json      @map("raw_recommendation")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  importRun ImportRun @relation(fields: [importRunId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, importRunId])
+  @@index([jobId])
+  @@index([importRunId])
+  @@map("job_recommendations")
+}
+
+model JobTracking {
+  id              String    @id @default(cuid())
+  jobId           String    @unique @map("job_id")
+  status          JobStatus @default(NEW)
+  statusChangedAt DateTime  @default(now()) @map("status_changed_at")
+  notes           String?
+  nextAction      String?   @map("next_action")
+  nextActionDate  DateTime? @map("next_action_date")
+  appliedAt       DateTime? @map("applied_at")
+  resumePath      String?   @map("resume_path")
+  resumeVersion   String?   @map("resume_version")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_tracking")
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+enum JobStatus {
+  NEW
+  INTERESTED
+  APPLYING
+  APPLIED
+  INTERVIEWING
+  OFFER
+  REJECTED
+  PASSED
+  ARCHIVED
+
+  @@map("job_status")
+}
+
+enum ImportRunStatus {
+  PENDING
+  SUCCESS
+  FAILED
+
+  @@map("import_run_status")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("priority")
+}

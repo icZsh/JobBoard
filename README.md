@@ -4,7 +4,7 @@ A local-only web application for importing daily job recommendations, reviewing 
 
 ## Current Status
 
-The project currently has the base Next.js, TypeScript, Tailwind, and ESLint scaffold in place. The product and implementation contract lives in:
+The project currently has the base Next.js, TypeScript, Tailwind, ESLint, Prisma, and Postgres schema scaffold in place. The product and implementation contract lives in:
 
 - `PRD.md`
 - `SPEC.md`
@@ -16,6 +16,12 @@ Install dependencies:
 
 ```bash
 npm install
+```
+
+Create local environment variables:
+
+```bash
+cp .env.example .env
 ```
 
 Run the development server:
@@ -33,6 +39,23 @@ npm run build
 ```
 
 Open [http://localhost:3000](http://localhost:3000) after starting the dev server.
+
+## Database
+
+The app expects a local Postgres database. If Docker is available, start the included service:
+
+```bash
+docker compose up -d db
+```
+
+Then apply migrations and seed initial settings:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+If Docker is not available, run any local Postgres instance and update `DATABASE_URL` in `.env`.
 
 ## Build Flow
 

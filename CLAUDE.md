@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Status
 
-**No application code exists yet.** This repo currently contains only `PRD.md` (product requirements) and `SPEC.md` (technical spec). Any implementation work starts from these two documents — read both before making non-trivial changes. `SPEC.md` is the source of truth for the data model, import contract, routes, and dedupe rules; `PRD.md` is the source of truth for user-facing behavior and scope.
+The repo contains the initial Next.js scaffold plus Prisma/Postgres database foundation. Implementation work still starts from `PRD.md` and `SPEC.md` — read both before making non-trivial changes. `SPEC.md` is the source of truth for the data model, import contract, routes, and dedupe rules; `PRD.md` is the source of truth for user-facing behavior and scope.
 
 ## Intended Stack (from SPEC.md)
 
@@ -19,8 +19,10 @@ Current commands:
 - `npm run lint` — run ESLint.
 - `npm run typecheck` — run TypeScript without emitting files.
 - `npm run build` — create a production build.
-
-Prisma commands will be added when the database layer lands.
+- `npm run db:generate` — generate the Prisma client into `src/generated/prisma`.
+- `npm run db:migrate` — run Prisma migrations against the configured Postgres database.
+- `npm run db:seed` — seed initial settings from `.env` without overwriting existing rows.
+- `npm run db:studio` — open Prisma Studio.
 
 ## Key Architectural Decisions
 
@@ -68,7 +70,7 @@ RESUME_FILE_PATH="/Users/isaaczhu/path/to/resume.pdf"
 HIGH_FIT_THRESHOLD="80"
 ```
 
-Resume is referenced by **local file path only** — V1 explicitly excludes file upload/storage.
+Resume is referenced by **local file path only** — V1 explicitly excludes file upload/storage. `RESUME_FILE_PATH` and `HIGH_FIT_THRESHOLD` are seed values only; the `settings` table becomes the source of truth after seeding.
 
 ## Build Order (from SPEC.md §Initial Build Order)
 
