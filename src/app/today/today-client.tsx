@@ -41,6 +41,9 @@ export type TodayJobItem = {
   priorityClass: string;
   suggestedAction: string | null;
   datePosted: string;
+  companyOverview: string | null;
+  benefitsOverview: string | null;
+  roleOverview: string | null;
   matchReason: string | null;
   concerns: string | null;
   matchedSkills: string[];
@@ -120,6 +123,25 @@ function SkillChips({
         </span>
       ))}
     </div>
+  );
+}
+
+function DetailCopy({
+  value,
+  fallback,
+}: {
+  value: string | null;
+  fallback: string;
+}) {
+  const text = value ?? fallback;
+
+  return (
+    <p
+      className="mt-2 h-[4.5rem] line-clamp-3 text-sm leading-6 text-[var(--ink-soft)]"
+      title={text}
+    >
+      {text}
+    </p>
   );
 }
 
@@ -223,29 +245,59 @@ function TodayCard({
       </div>
 
       <div
-        className={`overflow-hidden transition-all duration-300 ${
-          isOpen ? "mt-5 max-h-[420px] opacity-100" : "max-h-0 opacity-0"
+        aria-hidden={!isOpen}
+        className={`grid transition-all duration-300 ${
+          isOpen
+            ? "mt-5 grid-rows-[1fr] opacity-100"
+            : "pointer-events-none grid-rows-[0fr] opacity-0"
         }`}
       >
+        <div className="min-h-0 overflow-hidden">
+        {job.roleOverview ? (
+          <div className="mb-5 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] p-4">
+            <p className="paper-label">Role overview</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--ink)]">
+              {job.roleOverview}
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid gap-5 border-t border-[var(--hair)] pt-5 md:grid-cols-2">
           <div>
+            <p className="paper-label">Company</p>
+            <DetailCopy
+              fallback="No company overview provided."
+              value={job.companyOverview}
+            />
+          </div>
+          <div>
+            <p className="paper-label">Benefits</p>
+            <DetailCopy
+              fallback="No benefits information provided."
+              value={job.benefitsOverview}
+            />
+          </div>
+          <div>
             <p className="paper-label">Match Reason</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-              {job.matchReason ?? "No match reason provided."}
-            </p>
+            <DetailCopy
+              fallback="No match reason provided."
+              value={job.matchReason}
+            />
             <div className="mt-3">
               <SkillChips skills={job.matchedSkills} />
             </div>
           </div>
           <div>
             <p className="paper-label">Concerns</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
-              {job.concerns ?? "No major concerns."}
-            </p>
+            <DetailCopy
+              fallback="No major concerns."
+              value={job.concerns}
+            />
             <div className="mt-3">
               <SkillChips missing skills={job.missingSkills} />
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -342,6 +394,9 @@ export function TodayClient({
           job.company,
           job.location,
           job.remoteType,
+          job.companyOverview,
+          job.benefitsOverview,
+          job.roleOverview,
           ...job.matchedSkills,
           ...job.missingSkills,
         ]

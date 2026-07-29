@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ImportRunStatus, JobStatus } from "@/generated/prisma/client";
 import { formatDateOnly, formatSalary, formatTimestamp } from "@/lib/format";
+import { parseJobDescriptionSections } from "@/lib/jobs/description";
 import { isApplyTodayJob } from "@/lib/jobs/prioritization";
 import {
   getFitTier,
@@ -97,6 +98,7 @@ type RecommendationWithJob = Awaited<
 function toTodayItem(recommendation: RecommendationWithJob): TodayJobItem {
   const job = recommendation.job;
   const status = job.tracking?.status ?? JobStatus.NEW;
+  const descriptionSections = parseJobDescriptionSections(job.description);
 
   return {
     recommendationId: recommendation.id,
@@ -116,6 +118,9 @@ function toTodayItem(recommendation: RecommendationWithJob): TodayJobItem {
     priorityClass: priorityBadgeClass(recommendation.priority),
     suggestedAction: recommendation.suggestedAction,
     datePosted: job.datePosted ? formatDateOnly(job.datePosted) : "Unknown",
+    companyOverview: descriptionSections.company,
+    benefitsOverview: descriptionSections.benefits,
+    roleOverview: descriptionSections.role ?? descriptionSections.legacy,
     matchReason: recommendation.matchReason,
     concerns: recommendation.concerns,
     matchedSkills: recommendation.matchedSkills,

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { JobStatus } from "../src/generated/prisma/client";
 import { formatDateInput, formatSalary, formatStatusLabel } from "../src/lib/format";
-import { sanitizeJobDescription } from "../src/lib/jobs/description";
+import {
+  parseJobDescriptionSections,
+  sanitizeJobDescription,
+} from "../src/lib/jobs/description";
 import { isApplyTodayJob, isHighFit } from "../src/lib/jobs/prioritization";
 import {
   getLatestRecommendation,
@@ -102,6 +105,63 @@ test("sanitizes imported HTML descriptions before rendering", () => {
   assert.equal(sanitized.includes('href="https://example.com/jobs"'), true);
   assert.equal(sanitized.includes('target="_blank"'), true);
   assert.equal(sanitized.includes('rel="noreferrer"'), true);
+});
+
+test("parses labeled company, benefits, and role description sections", () => {
+  assert.deepEqual(
+    parseJobDescriptionSections(
+      "Company: Builds fraud detection tools.\r\n\r\nBenefits: Medical, dental, and a 401(k).\r\n\r\nRole: Own batch and streaming pipelines: Python, Spark, and Kafka.",
+    ),
+    {
+      company: "Builds fraud detection tools.",
+      benefits: "Medical, dental, and a 401(k).",
+      role: "Own batch and streaming pipelines: Python, Spark, and Kafka.",
+      legacy: null,
+    },
+  );
+});
+
+test("keeps empty labeled sections separate and supports legacy descriptions", () => {
+  assert.deepEqual(
+    parseJobDescriptionSections(
+      "Company:\nBenefits: Health coverage.\nRole: Build data products.",
+    ),
+    {
+      company: null,
+      benefits: "Health coverage.",
+      role: "Build data products.",
+      legacy: null,
+    },
+  );
+  assert.deepEqual(
+    parseJobDescriptionSections("  Build APIs and warehouse models.  "),
+    {
+      company: null,
+      benefits: null,
+      role: null,
+      legacy: "Build APIs and warehouse models.",
+    },
+  );
+});
+
+test("only treats description labels at the start of a line as sections", () => {
+  assert.deepEqual(
+    parseJobDescriptionSections(
+      "This employer offers Benefits: medical and dental coverage.",
+    ),
+    {
+      company: null,
+      benefits: null,
+      role: null,
+      legacy: "This employer offers Benefits: medical and dental coverage.",
+    },
+  );
+  assert.deepEqual(parseJobDescriptionSections(" \n\t "), {
+    company: null,
+    benefits: null,
+    role: null,
+    legacy: null,
+  });
 });
 
 test("parses known tracking statuses and rejects unknown values", () => {
