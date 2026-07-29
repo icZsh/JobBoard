@@ -73,7 +73,10 @@ function BoardCard({
     >
       <span className="absolute bottom-3 left-0 top-3 w-[3px] rounded-full bg-[var(--status-hue)]" />
       <h3 className="pl-2 text-[13.5px] font-bold leading-snug text-[var(--ink)]">
-        <Link className="paper-link" href={`/jobs/${job.id}`}>
+        <Link
+          className="paper-link after:absolute after:inset-0 after:z-[1] after:content-['']"
+          href={`/jobs/${job.id}`}
+        >
           {job.title}
         </Link>
       </h3>
@@ -101,7 +104,7 @@ function BoardCard({
         <span className="font-mono text-[10.5px] text-[var(--ink-faint)]">
           Seen {job.lastSeen}
         </span>
-        <div className="relative flex items-center gap-1.5">
+        <div className="relative z-10 flex items-center gap-1.5">
           {job.priority ? (
             <span className={`paper-badge px-2 py-1 text-[9.5px] ${job.priorityClass}`}>
               {job.priority}
