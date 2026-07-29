@@ -31,6 +31,22 @@ const optionalUrl = nullableTrimmedString.refine(
   { message: "Expected a valid URL" },
 );
 
+const optionalHttpUrl = nullableTrimmedString.refine(
+  (value) => {
+    if (!value) {
+      return true;
+    }
+
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  },
+  { message: "Expected a valid HTTP(S) URL" },
+);
+
 const prioritySchema = z
   .string()
   .trim()
@@ -54,6 +70,7 @@ export const importJobSchema = z.object({
   salary_min: optionalInt,
   salary_max: optionalInt,
   source_url: optionalUrl,
+  company_website_url: optionalHttpUrl,
   date_posted: dateOnlySchema.nullable().optional(),
   description: nullableTrimmedString,
   fit_score: optionalInt,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ImportRunStatus, JobStatus } from "@/generated/prisma/client";
 import { formatDateOnly, formatSalary, formatTimestamp } from "@/lib/format";
+import { getCompanyWebsiteUrl } from "@/lib/jobs/company-website";
 import { parseJobDescriptionSections } from "@/lib/jobs/description";
 import { isApplyTodayJob } from "@/lib/jobs/prioritization";
 import {
@@ -105,6 +106,9 @@ function toTodayItem(recommendation: RecommendationWithJob): TodayJobItem {
     jobId: job.id,
     title: job.title,
     company: job.company,
+    companyWebsiteUrl: getCompanyWebsiteUrl(
+      recommendation.rawRecommendation,
+    ),
     location: job.location,
     remoteType: job.remoteType,
     salary: formatSalary(job.salaryMin, job.salaryMax),

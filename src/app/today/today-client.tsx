@@ -28,6 +28,7 @@ export type TodayJobItem = {
   jobId: string;
   title: string;
   company: string;
+  companyWebsiteUrl: string | null;
   location: string | null;
   remoteType: string | null;
   salary: string | null;
@@ -206,9 +207,21 @@ function TodayCard({
             )}
           </div>
           <p className="mt-2 text-[14px] text-[var(--ink-soft)]">
-            <strong className="font-semibold text-[var(--ink)]">
-              {job.company}
-            </strong>
+            {job.companyWebsiteUrl ? (
+              <a
+                aria-label={`${job.company} official website (opens in a new tab)`}
+                className="paper-link font-semibold text-[var(--ink)] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                href={job.companyWebsiteUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                {job.company}
+              </a>
+            ) : (
+              <strong className="font-semibold text-[var(--ink)]">
+                {job.company}
+              </strong>
+            )}
             {job.location ? (
               <span className="text-[var(--ink-faint)]"> · {job.location}</span>
             ) : null}
