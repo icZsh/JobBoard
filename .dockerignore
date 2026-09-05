@@ -8,7 +8,6 @@ data
 backups
 .env*
 !.env.example
-!.env.selfhost.example
 *.tsbuildinfo
 src/generated/prisma
 .DS_Store

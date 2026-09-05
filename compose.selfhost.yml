@@ -1,7 +1,7 @@
 name: ${COMPOSE_PROJECT_NAME:-jobboard-selfhost}
 
 x-app-environment: &app-environment
-  DATABASE_URL: postgresql://jobboard:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.selfhost}@db:5432/jobboard
+  DATABASE_URL: postgresql://jobboard:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/jobboard
   DATA_DIR: /app/data
   AUTH_COOKIE_SECURE: "false"
   AUTH_INSTANCE_ID: ${COMPOSE_PROJECT_NAME:-jobboard-selfhost}
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: jobboard
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.selfhost}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: jobboard
     volumes:
       - database:/var/lib/postgresql/data

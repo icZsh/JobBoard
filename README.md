@@ -28,10 +28,10 @@ Without Git, [download this branch as a ZIP](https://github.com/icZsh/JobBoard/a
 ### 2. Set the database password
 
 ```sh
-cp .env.selfhost.example .env.selfhost
+cp .env.example .env
 ```
 
-Open `.env.selfhost` in a text editor and replace `POSTGRES_PASSWORD` with a long random password using letters, numbers, `-` and `_` (24 or more characters recommended). This is the database password; you will create your separate login password in the browser.
+Open `.env` in a text editor and replace `POSTGRES_PASSWORD` with a long random password using letters, numbers, `-` and `_` (24 or more characters recommended). This is the database password; you will create your separate login password in the browser.
 
 | Setting | What to do |
 | --- | --- |
@@ -45,7 +45,7 @@ Job preferences, company sources and your timezone are configured in the browser
 ### 3. Start JobBoard
 
 ```sh
-docker compose --env-file .env.selfhost -f compose.selfhost.yml up -d --build --wait
+docker compose --env-file .env -f compose.selfhost.yml up -d --build --wait
 ```
 
 Open **[http://localhost:3010](http://localhost:3010)**, using your chosen port if you changed it. You should see **Set up your search**.
@@ -82,10 +82,10 @@ Replace `COMPANY` with the company's actual board identifier. Use the board home
 
 Open **Settings → Resume**, upload a PDF, DOCX, Markdown or TXT file (up to 10 MB), review and edit the extracted text, then confirm it. Uploading alone does not activate the resume. Scanned PDFs need text supplied separately; OCR is not included. Invalid uploads leave the current confirmed resume in place.
 
-To enable tailoring, add your `GEMINI_API_KEY` to `.env.selfhost`, then apply it:
+To enable tailoring, add your `GEMINI_API_KEY` to `.env`, then apply it:
 
 ```sh
-docker compose --env-file .env.selfhost -f compose.selfhost.yml up -d --wait web
+docker compose --env-file .env -f compose.selfhost.yml up -d --wait web
 ```
 
 When you request tailoring for a job, the confirmed resume and job context are sent to Gemini. Generated resumes are available as Markdown downloads. The API key and a confirmed resume are both required for this feature; collection and tracking work independently.
@@ -109,16 +109,16 @@ Run these from the project folder:
 
 ```sh
 # Check services; migrate exiting with code 0 is expected.
-docker compose --env-file .env.selfhost -f compose.selfhost.yml ps -a
+docker compose --env-file .env -f compose.selfhost.yml ps -a
 
 # Inspect recent application and startup logs.
-docker compose --env-file .env.selfhost -f compose.selfhost.yml logs --tail=100 web worker migrate
+docker compose --env-file .env -f compose.selfhost.yml logs --tail=100 web worker migrate
 
 # Stop the installation, keeping its data.
-docker compose --env-file .env.selfhost -f compose.selfhost.yml stop
+docker compose --env-file .env -f compose.selfhost.yml stop
 
 # Start it again with the same configuration and volumes.
-docker compose --env-file .env.selfhost -f compose.selfhost.yml up -d --wait
+docker compose --env-file .env -f compose.selfhost.yml up -d --wait
 ```
 
 The database volume stores your account, settings, run history and application data. The files volume stores resumes and collection artifacts. Both survive container rebuilds; deleting volumes with `down -v` deletes that data. Completed raw collection snapshots are kept for 30 days by default, while run summaries and application history remain.
@@ -138,7 +138,7 @@ Before updating the checkout or rebuilding for a new version, follow the [upgrad
 | Problem | What to check |
 | --- | --- |
 | Docker cannot connect, or `compose` / `buildx` is missing | Start Docker Desktop, or enable the required plugins for Docker Engine. On Windows, check WSL integration. |
-| Startup reports that port 3010 is in use | Set a free `JOBBOARD_PORT` in `.env.selfhost`, run the start command again, and open the new port. |
+| Startup reports that port 3010 is in use | Set a free `JOBBOARD_PORT` in `.env`, run the start command again, and open the new port. |
 | The page does not open or startup fails | Run `ps -a` and the logs command above. `db`, `web` and `worker` should be running; `migrate` should have exited with code 0. For database errors, also inspect `logs --tail=100 db`. |
 | Login appears instead of first setup | This Compose project already has an account in its data volume. Sign in with that account. A separate installation needs its own project name and port. |
 | A collection remains queued | Check the worker logs and that Docker is running. Closing the browser does not stop the worker. |

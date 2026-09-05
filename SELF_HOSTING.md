@@ -5,10 +5,10 @@ This is a private, single-administrator installation. Docker Engine with the Com
 ## First start
 
 ```sh
-cp .env.selfhost.example .env.selfhost
-# Set POSTGRES_PASSWORD to a long random URL-safe password in .env.selfhost.
+cp .env.example .env
+# Set POSTGRES_PASSWORD to a long random URL-safe password in .env.
 # JOBBOARD_PORT defaults to 3010; set another free port if needed.
-docker compose --env-file .env.selfhost -f compose.selfhost.yml up -d --build --wait
+docker compose --env-file .env -f compose.selfhost.yml up -d --build --wait
 ```
 
 Open [JobBoard](http://localhost:3010). First setup creates the only administrator and saves your timezone, daily time, search preferences and companies. The browser detects an initial timezone; verify it before saving. Use Settings to upload an optional resume, review/edit extracted text and confirm it. Start the first collection from the setup completion screen or Today. Subsequent daily collection is automatic when enabled; its default is 09:00 in your chosen timezone.
@@ -23,7 +23,7 @@ The first build needs network access to image/package registries; collection nee
 - **Companies:**18 initial templates; enable/disable, delete, or add an Ashby, Greenhouse or Lever board by its official ATS recruitment URL. Only these provider hosts are accepted. A valid URL can still identify a closed/renamed board; the run report shows that source failure.
 - **Resume:** PDF, DOCX, Markdown or TXT, at most 10 MB by default. Confirm the editable extracted text before use. Image-only scans require you to supply text yourself; OCR is not included. Encrypted, damaged and empty files return an error without replacing the active resume.
 - **Today:** latest run outcome, last successful run, next scheduled run and per-company coverage; run now/retry queues work without holding the browser request open. Multiple clicks while a run is pending resolve to the same queued/active run.
-- **Tailoring:** optional. Add `GEMINI_API_KEY` to `.env.selfhost`, then recreate the web service. This sends the confirmed resume and the selected job context to Gemini only when you request tailoring. Without a key, all collection, rule scoring, Board and tracking functionality works; tailoring controls explain why unavailable. Downloads remain Markdown.
+- **Tailoring:** optional. Add `GEMINI_API_KEY` to `.env`, then recreate the web service. This sends the confirmed resume and the selected job context to Gemini only when you request tailoring. Without a key, all collection, rule scoring, Board and tracking functionality works; tailoring controls explain why unavailable. Downloads remain Markdown.
 
 Environment variables carry deployment parameters and optional model credentials only. Search configuration lives in PostgreSQL and is not overwritten at startup or on upgrade. `HIGH_FIT_THRESHOLD` and old local resume path environment variables are not required for this installation.
 
@@ -34,7 +34,7 @@ scripts/selfhost/compose.sh stop             # Preserve volumes
 scripts/selfhost/compose.sh up -d --wait     # Resume
 ```
 
-The helper always selects `compose.selfhost.yml` and `.env.selfhost`. Set `JOBBOARD_ENV_FILE=/absolute/path/to/another.env` to operate another isolated instance. Set a distinct `COMPOSE_PROJECT_NAME` and port in that file; Compose prefixes both persistent volumes with the project name. Do not use `down -v` unless you intend to delete that instance's database and files.
+The helper always selects `compose.selfhost.yml` and the checkout's `.env`, even when called from another directory. To keep another isolated instance's configuration elsewhere, set `JOBBOARD_ENV_FILE=/absolute/path/to/another-instance/.env`. Set a distinct `COMPOSE_PROJECT_NAME` and port in that file; Compose prefixes both persistent volumes with the project name. Do not use `down -v` unless you intend to delete that instance's database and files.
 
 ## Scheduling, failures and recovery
 
@@ -53,6 +53,8 @@ Run summaries, observation/dedup state and nonterminal recovery material remain 
 3. Update this checkout to the desired reviewed version.
 4. Run `scripts/selfhost/compose.sh up -d --build --wait`.
 
+If upgrading from a version that used a different environment filename, move your existing deployment configuration to `.env` before running the updated helper. Preserve the database password, project name and port; do not replace an existing installation's configuration with the example file.
+
 The one-shot migration service runs before web/worker. Persistent volumes and web settings are reused. A migration failure prevents new application services starting; inspect migration logs before retrying. Do not assume downgrading an image rolls back a database migration: restore the complete backup into a fresh project if rollback is needed.
 
 ## Complete backup
@@ -61,18 +63,26 @@ The one-shot migration service runs before web/worker. Persistent volumes and we
 scripts/selfhost/backup.sh /absolute/path/to/new-backup-directory
 ```
 
-The script briefly stops web and worker, uses PostgreSQL's custom-format dump, archives the entire files volume, saves the deployment environment and image list, then restores the prior running/stopped state of each service. Only a finished backup gets a `COMPLETE` marker. The directory is private and includes resume contents, job history, account/session data and model/database credentials; store it as private personal data. The JSON export in the UI is a useful business-data export, not a substitute for this backup.
+The script briefly stops web and worker, uses PostgreSQL's custom-format dump, archives the entire files volume, saves the deployment environment as `.env` alongside the image list, then restores the prior running/stopped state of each service. Only a finished backup gets a `COMPLETE` marker. The directory is private and includes resume contents, job history, account/session data and model/database credentials; store it as private personal data. The JSON export in the UI is a useful business-data export, not a substitute for this backup.
 
 The matching checkout/image must also be retained for reproducible rollback. The script records image IDs, but does not export images.
 
 ## Restore into a fresh instance
 
-Prepare `.env.restore` from the backup's `deployment.env`. Set a new `COMPOSE_PROJECT_NAME` (for example `jobboard-restored`) and a free `JOBBOARD_PORT`. Retain the backup's PostgreSQL password. Build images for the checked-out version, then restore:
+Use a fresh checkout of the version you want to restore. Copy the backup's `.env` into that checkout:
 
 ```sh
-JOBBOARD_ENV_FILE="$PWD/.env.restore" scripts/selfhost/compose.sh build
-JOBBOARD_ENV_FILE="$PWD/.env.restore" scripts/selfhost/restore.sh /absolute/path/to/backup-directory
+cp /absolute/path/to/backup-directory/.env .env
 ```
+
+In this new `.env`, set a new `COMPOSE_PROJECT_NAME` (for example `jobboard-restored`) and a free `JOBBOARD_PORT`. Retain the backup's PostgreSQL password. Build images for the checked-out version, then restore:
+
+```sh
+scripts/selfhost/compose.sh build
+scripts/selfhost/restore.sh /absolute/path/to/backup-directory
+```
+
+Older backups stored the configuration as `deployment.env`; copy that file to `.env` instead. Their database and files archives remain compatible.
 
 Restore refuses a nonempty database or files volume. It starts only the new database, restores both stores, then applies pending migrations and starts the app. Log in with the restored administrator account. Verify settings, confirmed resume download and a known application with notes. The original instance remains separate and can be stopped later if you choose to switch.
 
@@ -82,10 +92,10 @@ Implementation/acceptance use `/Users/isaaczhu/JobBoard-self-hosted`, branch `fe
 
 ## Test the implementation in Docker
 
-Use a disposable `.env.selfhost` with `COMPOSE_PROJECT_NAME=jobboard-selfhost-dev` and port 3017. The test override creates a separate in-memory PostgreSQL database; it does not use the web instance database.
+Use a disposable `.env` with `COMPOSE_PROJECT_NAME=jobboard-selfhost-dev` and port 3017. The test override creates a separate in-memory PostgreSQL database; it does not use the web instance database.
 
 ```sh
-docker compose --env-file .env.selfhost -f compose.selfhost.yml -f compose.selfhost.test.yml --profile test run --build --rm tests
+docker compose --env-file .env -f compose.selfhost.yml -f compose.selfhost.test.yml --profile test run --build --rm tests
 ```
 
 The gated `scripts/selfhost/check-http.mjs` also exercises the running isolated web API. It requires `JOBBOARD_ACCEPTANCE_TESTS=1`, an explicit `--target http://localhost:3017`, `TEST_ADMIN_EMAIL` and `TEST_ADMIN_PASSWORD`; inspect its usage before running because it creates test-only resume/job records. For complete fault/rebuild/restore evidence, see the validation report.

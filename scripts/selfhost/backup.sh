@@ -27,7 +27,7 @@ trap resume_writers EXIT
 "$compose" stop web worker
 "$compose" exec -T db pg_dump -U jobboard -d jobboard --format=custom > "$destination/database.dump"
 "$compose" run --rm --no-deps -T --entrypoint tar web -C /app/data -czf - . > "$destination/files.tar.gz"
-cp "${JOBBOARD_ENV_FILE:-$repo/.env.selfhost}" "$destination/deployment.env"
+cp "${JOBBOARD_ENV_FILE:-$repo/.env}" "$destination/.env"
 "$compose" images --format json > "$destination/images.json"
 printf '%s\n' 'JobBoard full backup v1' > "$destination/COMPLETE"
 echo "Backup complete: $destination"
