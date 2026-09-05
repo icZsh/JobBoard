@@ -65,12 +65,19 @@ These should be derived in queries or view helpers — don't denormalize them on
 ## Environment
 
 ```
-DATABASE_URL="postgresql://jobboard:jobboard@localhost:5432/jobboard"
-RESUME_FILE_PATH="/Users/isaaczhu/path/to/resume.pdf"
+DATABASE_URL="postgresql://jobboard:***@localhost:5432/jobboard"
+RESUME_FILE_PATH="/Users/isaaczhu/Isaac's Vault/Jobs/Resumes/Resume-Isaac Zhu.md"
 HIGH_FIT_THRESHOLD="80"
+GEMINI_API_KEY="your_gemini_api_key_here"
+# Optional fallback/override values:
+GOOGLE_API_KEY="your_google_api_key_here"
+GEMINI_RESUME_MODEL="gemini-3.1-pro"
+TAILORED_RESUME_ROOT="/Users/isaaczhu/Isaac's Vault/Jobs/Resumes/Tailored"
 ```
 
 Resume is referenced by **local file path only** — V1 explicitly excludes file upload/storage. `RESUME_FILE_PATH` and `HIGH_FIT_THRESHOLD` are seed values only; the `settings` table becomes the source of truth after seeding.
+
+Resume tailoring is a deliberate post-V1, resume-only feature. It expects a Markdown/plain-text base resume, calls Gemini directly through the JobBoard server adapter, writes generated Markdown under `TAILORED_RESUME_ROOT`, and updates `job_tracking.resumePath` / `resumeVersion`. Keep API keys in `.env`; do not store them in the database. Cover letters, cover-letter tracking fields, batch generation, PDF export, and resume history tables remain out of scope.
 
 ## Build Order (from SPEC.md §Initial Build Order)
 

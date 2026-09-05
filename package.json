@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:lan": "next start -H 0.0.0.0 -p 3000",
     "test": "tsx --env-file=.env --test --test-reporter=spec tests/**/*.test.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -16,6 +17,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@google/genai": "^2.8.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",

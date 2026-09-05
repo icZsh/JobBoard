@@ -11,6 +11,7 @@ import {
   getLatestRecommendation,
   sortRecommendationsByLatest,
 } from "../src/lib/jobs/recommendations";
+import { canTailorResumeForStatus } from "../src/lib/jobs/resume-tailoring";
 import { parseJobStatus } from "../src/lib/jobs/tracking";
 
 test("formats status, salaries, and date inputs for UI controls", () => {
@@ -36,7 +37,7 @@ test("identifies high-fit and apply-today jobs from recommendation context", () 
       suggestedAction: "Apply today.",
       highFitThreshold: 80,
     }),
-    true,
+    false,
   );
   assert.equal(
     isApplyTodayJob({
@@ -58,6 +59,19 @@ test("identifies high-fit and apply-today jobs from recommendation context", () 
     }),
     true,
   );
+});
+
+test("identifies active statuses eligible for resume tailoring", () => {
+  assert.equal(canTailorResumeForStatus(JobStatus.INTERESTED), true);
+  assert.equal(canTailorResumeForStatus(JobStatus.APPLYING), true);
+  assert.equal(canTailorResumeForStatus(JobStatus.APPLIED), true);
+  assert.equal(canTailorResumeForStatus(JobStatus.INTERVIEWING), true);
+  assert.equal(canTailorResumeForStatus(JobStatus.NEW), false);
+  assert.equal(canTailorResumeForStatus(JobStatus.OFFER), false);
+  assert.equal(canTailorResumeForStatus(JobStatus.REJECTED), false);
+  assert.equal(canTailorResumeForStatus(JobStatus.PASSED), false);
+  assert.equal(canTailorResumeForStatus(JobStatus.ARCHIVED), false);
+  assert.equal(canTailorResumeForStatus(null), false);
 });
 
 test("sorts recommendations by newest run date and import creation time", () => {

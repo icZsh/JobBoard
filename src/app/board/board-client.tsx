@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { formatStatusLabel } from "@/lib/format";
+import { getJobDetailHref } from "@/lib/jobs/links";
 
 export const boardStatuses = [
   "NEW",
@@ -75,7 +76,7 @@ function BoardCard({
       <h3 className="pl-2 text-[13.5px] font-bold leading-snug text-[var(--ink)]">
         <Link
           className="paper-link after:absolute after:inset-0 after:z-[1] after:content-['']"
-          href={`/jobs/${job.id}`}
+          href={getJobDetailHref(job.id)}
         >
           {job.title}
         </Link>

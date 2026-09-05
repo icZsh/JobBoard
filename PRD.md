@@ -47,6 +47,7 @@ Isaac, using the app locally on his own machine.
 - Highlight high-fit jobs.
 - Show jobs recommended for "apply today".
 - Store a local resume file path, not the resume file itself.
+- Generate a job-specific Markdown resume for an active job as a deliberate post-V1 enhancement.
 - Provide a JSON export endpoint for manual backup.
 
 ### Excluded From V1
@@ -56,7 +57,7 @@ Isaac, using the app locally on his own machine.
 - Employer accounts.
 - Payments.
 - Automated scraping inside the app.
-- Resume or cover letter generation, and any cover letter tracking fields.
+- Cover letter generation, cover letter tracking fields, batch resume generation, resume PDF export, and first-class resume history management.
 - File upload or file storage for resumes.
 - Analytics dashboard.
 - Multi-user collaboration.
@@ -78,6 +79,7 @@ Expected capabilities:
 
 - View latest recommended jobs.
 - See title, company, location, remote type, salary if available, fit score, priority, and recommendation context.
+- Open the matching posting detail page from a job title in a new tab so the daily review context stays available.
 - Highlight high-fit jobs.
 - Clearly indicate "Apply Today" jobs.
 - Quick status actions:
