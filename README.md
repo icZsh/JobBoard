@@ -2,11 +2,15 @@
 
 A local-only web application for importing daily job recommendations, reviewing high-fit roles, and tracking applications.
 
+## Docker self-hosting
+
+For a private installation with web setup, automatic ATS collection and optional resume uploads, follow [SELF_HOSTING.md](SELF_HOSTING.md). Start with `compose.selfhost.yml`; it is independent of the original local startup configuration below. No Codex, launchd or host Node/Python is required to run the Docker installation.
+
 An optional independent ATS collector is documented in [the collector quickstart](specs/003-ats-collector/quickstart.md). `npm run collector:collect` generates local review artifacts from 18 configured company boards; it does not import jobs or change existing scheduled tasks.
 
 ## Current Status
 
-The project currently has the base Next.js, TypeScript, Tailwind, ESLint, Prisma, and Postgres schema scaffold in place. The product and implementation contract lives in:
+The app implements daily review, a persistent application Board, imports, tracking, single-admin setup, Docker collection and managed resumes. Product and implementation contracts live in:
 
 - `PRD.md`
 - `SPEC.md`

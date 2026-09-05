@@ -1,4 +1,5 @@
 "use server";
+import { requireAdmin, assertServerActionOrigin } from "@/lib/auth/authorization";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -29,6 +30,8 @@ function getRedirectTarget(formData: FormData) {
 }
 
 export async function updateTodayJobStatus(formData: FormData) {
+  await requireAdmin("/today");
+  await assertServerActionOrigin();
   const jobId = getFormString(formData, "jobId");
   const status = getFormString(formData, "status") as JobStatusValue;
 

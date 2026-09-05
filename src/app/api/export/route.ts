@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireApiAdmin } from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,7 +8,8 @@ function getExportFileName(date: Date) {
   return `job-board-export-${date.toISOString().slice(0, 10)}.json`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await requireApiAdmin(request); if (denied) return denied;
   const exportedAt = new Date();
   const [jobs, jobTracking, jobRecommendations, importRuns, settings] =
     await prisma.$transaction([

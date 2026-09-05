@@ -29,6 +29,12 @@ type PreviewImportJob = PreparedImportJob & {
 
 type ImportPreviewRow = ImportPreviewResult["rows"][number];
 
+export interface ImportOptions {
+  idempotencyKey?: string;
+  /** The self-hosted worker checks its session lock before an import can commit. */
+  assertLease?: () => Promise<void>;
+}
+
 export type ImportJobsResult =
   | {
       ok: true;
@@ -443,11 +449,16 @@ export async function previewImportPayload(
 export async function importJobsPayload(
   payload: unknown,
   db: PrismaClientLike = defaultPrisma,
+  options: ImportOptions = {},
 ): Promise<ImportJobsResult> {
   const envelope = minimumImportEnvelopeSchema.safeParse(payload);
 
   if (!envelope.success) {
     throw new MinimumEnvelopeError(formatZodError(envelope.error));
+  }
+
+  if (options.idempotencyKey !== undefined) {
+    return importIdempotently(payload, db, options);
   }
 
   const importRun = await db.importRun.create({
@@ -525,5 +536,76 @@ export async function importJobsPayload(
       errorKind: "processing",
       errorMessage,
     };
+  }
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function savedSuccessfulResult(value: Prisma.JsonValue | null, importRunId: string): Extract<ImportJobsResult, { ok: true }> {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value.ok !== true || value.status !== ImportRunStatus.SUCCESS || value.importRunId !== importRunId) {
+    throw new Error("Saved import result is invalid; refusing to repeat a successful import");
+  }
+  for (const field of ["receivedJobs", "importedJobs", "skippedDuplicateRows", "createdJobs", "updatedJobs", "recommendationsCreated"] as const) {
+    if (typeof value[field] !== "number" || !Number.isSafeInteger(value[field]) || value[field] < 0) {
+      throw new Error("Saved import counts are invalid; refusing to repeat a successful import");
+    }
+  }
+  const result = value as Extract<ImportJobsResult, { ok: true }>;
+  if (result.createdJobs + result.updatedJobs !== result.importedJobs || result.recommendationsCreated !== result.importedJobs || result.receivedJobs - result.skippedDuplicateRows !== result.importedJobs) {
+    throw new Error("Saved import counts are inconsistent; refusing to repeat a successful import");
+  }
+  return result;
+}
+
+async function importIdempotently(payload: unknown, db: PrismaClientLike, options: ImportOptions): Promise<ImportJobsResult> {
+  const key = options.idempotencyKey!;
+  if (!key.trim() || key.length > 256) throw new Error("Import idempotency key must contain 1–256 characters");
+  const envelope = minimumImportEnvelopeSchema.parse(payload);
+  try {
+    return await db.$transaction(async (tx) => {
+      // Lock and all writes share one transaction: disconnect/rollback releases it automatically.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`jobboard:import:${key}`}, 0))`;
+      await options.assertLease?.();
+      const existing = await tx.importRun.findUnique({ where: { idempotencyKey: key } });
+      if (existing && canonicalJson(existing.rawPayload) !== canonicalJson(payload)) throw new Error("Idempotency key already belongs to a different payload");
+      if (existing?.status === ImportRunStatus.SUCCESS) {
+        return savedSuccessfulResult(existing.result, existing.id);
+      }
+      const run = existing ?? await tx.importRun.create({ data: {
+        idempotencyKey: key, runDate: parseDateOnly(envelope.run_date), rawPayload: payload as Prisma.InputJsonValue,
+        sourceName: getSourceName(payload), status: ImportRunStatus.PENDING,
+      } });
+      const validated = importPayloadSchema.safeParse(payload);
+      if (!validated.success) {
+        const result: ImportJobsResult = {
+          ok: false, importRunId: run.id, status: ImportRunStatus.FAILED, errorKind: "validation",
+          errorMessage: formatZodError(validated.error), validationErrors: validated.error.issues.map((issue) => issue.message),
+        };
+        await options.assertLease?.();
+        await tx.importRun.update({ where: { id: run.id }, data: { status: ImportRunStatus.FAILED, errorMessage: result.errorMessage, result } });
+        return result;
+      }
+      if (existing && await tx.jobRecommendation.count({ where: { importRunId: run.id } })) {
+        throw new Error("Unfinished import already has recommendations; manual reconciliation is required");
+      }
+      const { prepared, deduped } = prepareJobs(payload);
+      const stats = await processImportRun(tx, run.id, deduped);
+      const result: ImportJobsResult = {
+        ok: true, importRunId: run.id, status: ImportRunStatus.SUCCESS,
+        receivedJobs: prepared.length, importedJobs: deduped.length, skippedDuplicateRows: prepared.length - deduped.length, ...stats,
+      };
+      await options.assertLease?.();
+      await tx.importRun.update({ where: { id: run.id }, data: { status: ImportRunStatus.SUCCESS, errorMessage: null, result } });
+      return result;
+    }, { maxWait: 15000, timeout: 60000 });
+  } catch (error) {
+    // A processing failure rolls back the entire keyed import. Retrying this exact key and payload is safe.
+    return { ok: false, errorKind: "processing", errorMessage: error instanceof Error ? error.message : "Import failed unexpectedly" };
   }
 }

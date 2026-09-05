@@ -4,6 +4,8 @@ import { AlertTriangle, ArrowRight, CalendarCheck, Check, Sparkles } from "lucid
 import { useMemo, useState } from "react";
 import { formatStatusLabel } from "@/lib/format";
 import { canTailorResumeForStatus } from "@/lib/jobs/resume-tailoring";
+import Link from "next/link";
+import { isResumeDownloadUrl } from "@/lib/resume/links";
 
 type TrackingFormState = {
   status: string;
@@ -51,11 +53,13 @@ export function TrackingForm({
   sourceUrl,
   statusOptions,
   initial,
+  resumeCapability,
 }: {
   jobId: string;
   sourceUrl: string | null;
   statusOptions: StatusOption[];
   initial: TrackingFormState;
+  resumeCapability: { enabled: boolean; reason: string | null };
 }) {
   const [form, setForm] = useState(initial);
   const [lastSaved, setLastSaved] = useState(initial);
@@ -94,8 +98,6 @@ export function TrackingForm({
           nextAction: form.nextAction,
           nextActionDate: form.nextActionDate || null,
           appliedAt: form.appliedAt || null,
-          resumePath: form.resumePath,
-          resumeVersion: form.resumeVersion,
         }),
       });
 
@@ -112,7 +114,7 @@ export function TrackingForm({
   }
 
   async function tailorResume() {
-    if (!canTailorResume || tailoring) {
+    if (!canTailorResume || !resumeCapability.enabled || tailoring) {
       return;
     }
 
@@ -243,7 +245,7 @@ export function TrackingForm({
                   Resume tailoring
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
-                  Uses the configured Markdown resume and this job&apos;s recommendation context.
+                  Uses your confirmed resume and this job&apos;s description.
                 </p>
               </div>
               <Sparkles className="mt-0.5 h-4 w-4 flex-none text-[var(--accent-ink)]" />
@@ -251,13 +253,15 @@ export function TrackingForm({
 
             <button
               className="paper-btn paper-btn-solid mt-3 w-full"
-              disabled={tailoring}
+              disabled={tailoring || !resumeCapability.enabled}
               onClick={() => void tailorResume()}
               type="button"
             >
               <Sparkles className="h-4 w-4" />
               {tailoring ? "Generating" : "Tailor resume"}
             </button>
+
+            {!resumeCapability.enabled ? <p className="mt-2 text-xs text-[var(--ink-soft)]">{resumeCapability.reason} <Link className="underline" href="/settings/resume">Manage resume</Link></p> : null}
 
             {tailoring ? (
               <p className="mt-2 text-xs text-[var(--ink-soft)]">
@@ -280,9 +284,7 @@ export function TrackingForm({
                 <p className="mt-1 break-all font-mono text-[10.5px] leading-5 text-[var(--accent-ink)]">
                   {form.resumeVersion || "Tailored resume"}
                 </p>
-                <p className="mt-1 break-all font-mono text-[10.5px] leading-5 text-[var(--ink-soft)]">
-                  {form.resumePath}
-                </p>
+                {isResumeDownloadUrl(form.resumePath) ? <a className="paper-btn mt-2" href={form.resumePath} download>Download tailored resume</a> : <p className="mt-2 text-xs">A legacy resume reference is saved. Generate a new resume to download it here.</p>}
               </div>
             ) : null}
 
@@ -310,25 +312,7 @@ export function TrackingForm({
           </div>
         ) : null}
 
-        <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[var(--ink)]">Resume path</span>
-          <input
-            className="paper-input"
-            onChange={(event) => update("resumePath", event.target.value)}
-            value={form.resumePath}
-          />
-        </label>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[var(--ink)]">
-            Resume version
-          </span>
-          <input
-            className="paper-input"
-            onChange={(event) => update("resumeVersion", event.target.value)}
-            value={form.resumeVersion}
-          />
-        </label>
+        {form.resumePath && isResumeDownloadUrl(form.resumePath) && !canTailorResume ? <a className="paper-btn" href={form.resumePath} download>Download saved resume</a> : null}
 
         <div className="mt-1 flex items-center gap-3">
           <button

@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+dist
+.collector-output
+.selfhost-validation
+data
+backups
+.env*
+!.env.example
+!.env.selfhost.example
+*.tsbuildinfo
+src/generated/prisma
+.DS_Store

@@ -3,6 +3,7 @@ import {
   type ResumeTailoringErrorCode,
 } from "@/lib/resume/errors";
 import { tailorResumeForJob } from "@/lib/resume/tailor-service";
+import { requireApiAdmin } from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +25,11 @@ function chooseResumeTailoringStatus(error: unknown) {
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const denied = await requireApiAdmin(request);
+  if (denied) return denied;
   const { id } = await context.params;
 
   try {

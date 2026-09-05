@@ -28,6 +28,7 @@ export const defaultRules: CollectorRules = {
   ],
   excludedCompanyPatterns: [],
   skills: ["Python", "SQL", "Spark", "Hive", "dbt", "Airflow", "Snowflake", "BigQuery", "Kafka", "Flink", "AWS", "GCP", "Azure", "Databricks", "Docker", "Kubernetes", "Terraform", "Elasticsearch", "Redshift", "Trino"],
+  minExperienceYears: 2,
   maxExperienceYears: 5,
   maxPostingAgeDays: 30,
   preferredSalaryMin: 160000,
@@ -49,6 +50,7 @@ const rulesSchema = z.strictObject({
   usRemotePatterns: patterns.default(defaultRules.usRemotePatterns),
   excludedCompanyPatterns: patterns.default(defaultRules.excludedCompanyPatterns),
   skills: z.array(z.string().trim().min(1).max(80)).max(100).default(defaultRules.skills),
+  minExperienceYears: z.number().int().min(0).max(50).default(2),
   maxExperienceYears: z.number().int().min(0).max(50).default(defaultRules.maxExperienceYears),
   maxPostingAgeDays: z.number().int().min(0).max(3650).default(defaultRules.maxPostingAgeDays),
   preferredSalaryMin: z.number().int().min(0).max(10000000).default(defaultRules.preferredSalaryMin),
@@ -73,6 +75,9 @@ const configSchema = z.strictObject({
     concurrency: z.number().int().min(1).max(10).default(defaultRequest.concurrency),
   }).prefault({}),
 }).superRefine((config, context) => {
+  if ((config.rules.minExperienceYears ?? 2) > config.rules.maxExperienceYears) {
+    context.addIssue({ code: "custom", path: ["rules", "minExperienceYears"], message: "Minimum experience preference must not exceed the maximum." });
+  }
   const seen = new Set<string>();
   config.sources.forEach((source, index) => {
     const key = sourceKey(source);

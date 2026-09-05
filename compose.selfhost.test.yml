@@ -1,0 +1,32 @@
+# Opt-in tests use their own empty database, never the web instance's database.
+services:
+  test-db:
+    image: postgres:16-bookworm
+    profiles: [test]
+    environment:
+      POSTGRES_USER: jobboard
+      POSTGRES_PASSWORD: tests-only
+      POSTGRES_DB: jobboard_tests
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobboard -d jobboard_tests"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  tests:
+    image: jobboard-selfhost-dev-tests:local
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: Dockerfile.selfhost
+      target: test
+    init: true
+    environment:
+      DATABASE_URL: postgresql://jobboard:tests-only@test-db:5432/jobboard_tests
+      DATA_DIR: /tmp/jobboard-test-data
+      JOBBOARD_INTEGRATION_TESTS: "1"
+    depends_on:
+      test-db:
+        condition: service_healthy
+    command: ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && npm test"]

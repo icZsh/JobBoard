@@ -1,4 +1,5 @@
 "use server";
+import { requireAdmin, assertServerActionOrigin } from "@/lib/auth/authorization";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -10,6 +11,8 @@ function getFormString(formData: FormData, key: string) {
 }
 
 export async function updateBoardJobStatus(formData: FormData) {
+  await requireAdmin("/board");
+  await assertServerActionOrigin();
   const jobId = getFormString(formData, "jobId");
   const status = parseJobStatus(getFormString(formData, "status"));
 

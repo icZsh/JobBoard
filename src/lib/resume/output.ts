@@ -3,8 +3,7 @@ import path from "node:path";
 import { ResumeTailoringError } from "./errors";
 
 export const TAILORED_RESUME_ROOT =
-  process.env.TAILORED_RESUME_ROOT ||
-  "/Users/isaaczhu/Isaac's Vault/Jobs/Resumes/Tailored";
+  path.resolve(process.env.DATA_DIR || "./data", "resumes", "tailored");
 
 export type TailoredResumeDestination = {
   resumePath: string;
@@ -91,7 +90,7 @@ export function createTailoredResumeDestination({
 
 async function defaultWriteTextFile(filePath: string, content: string) {
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, content, { flag: "wx" });
+  await writeFile(filePath, content, { flag: "wx", mode: 0o600 });
 }
 
 function isFileExistsError(error: unknown) {

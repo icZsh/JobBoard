@@ -1,0 +1,3 @@
+# PDF xref whitespace and Office ZIP bytes are part of the parser fixtures.
+tests/fixtures/resumes/*.pdf binary
+tests/fixtures/resumes/*.docx binary

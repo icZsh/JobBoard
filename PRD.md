@@ -67,6 +67,10 @@ Isaac, using the app locally on his own machine.
 
 An independent command-line collector may read public Ashby, Greenhouse and Lever boards for a curated, editable set of historical companies. It generates deterministic rule-ranked daily JSON and a review report in a separate local output directory. Collection does not write to the JobBoard database. Explicit import remains a separate action using the existing import contract. Existing scheduled recommendations, launch agents, vault files and personal tracking are unaffected. Scheduler examples are not installed or activated by development commands. Missing-from-feed observations are kept in collector artifacts and do not alter personal application status. See `specs/003-ats-collector/`.
 
+### Docker self-hosting (opt-in post-V1)
+
+This feature explicitly extends the V1 exclusions for single-admin authentication, automated in-app collection, and managed resume upload/storage. A fresh instance needs only Docker Compose and web setup. It supports a user-defined US job search,18 editable company templates, local-time daily scheduling, partial-source reporting and crash-safe direct import, plus optional confirmed-resume tailoring. All ordinary features work without Codex or a model key. Generated resumes remain Markdown. PostgreSQL and a files volume persist through upgrades; backups include both. Public deployment, registration and multi-tenancy remain excluded. The original personal workflow is not migrated or modified. See `specs/004-docker-self-hosting/spec.md` and `SELF_HOSTING.md`.
+
 ### Security Assumption
 
 V1 is local-only and unauthenticated. The app should be served on localhost, should not enable broad CORS, and should treat export data as private personal data.

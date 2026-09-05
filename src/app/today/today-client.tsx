@@ -195,6 +195,7 @@ function FitStat({ job }: { job: TodayJobItem }) {
 function TodayCard({
   job,
   highFitThreshold,
+  resumeCapability,
   isOpen,
   onToggleOpen,
   onStatusChange,
@@ -202,6 +203,7 @@ function TodayCard({
 }: {
   job: TodayJobItem;
   highFitThreshold: number;
+  resumeCapability: { enabled: boolean; reason: string | null };
   isOpen: boolean;
   onToggleOpen: () => void;
   onStatusChange: (job: TodayJobItem, status: string) => void;
@@ -215,7 +217,7 @@ function TodayCard({
   const [tailorChanges, setTailorChanges] = useState<string[]>([]);
 
   async function tailorResume() {
-    if (!canTailorResume || tailoring) {
+    if (!canTailorResume || !resumeCapability.enabled || tailoring) {
       return;
     }
 
@@ -399,12 +401,13 @@ function TodayCard({
                   Resume tailoring
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--ink-soft)]">
-                  Generate a Markdown resume from this job&apos;s recommendation context.
+                  {resumeCapability.reason ?? "Generate a Markdown resume from your confirmed resume and this job."}
                 </p>
               </div>
               <button
                 className="paper-btn paper-btn-solid h-9 px-3 text-xs"
-                disabled={tailoring}
+                disabled={tailoring || !resumeCapability.enabled}
+                title={resumeCapability.reason ?? undefined}
                 onClick={() => void tailorResume()}
                 type="button"
               >
@@ -435,9 +438,9 @@ function TodayCard({
                 <p className="mt-1 break-all font-mono text-[10.5px] leading-5 text-[var(--accent-ink)]">
                   {job.resumeVersion || "Tailored resume"}
                 </p>
-                <p className="mt-1 break-all font-mono text-[10.5px] leading-5 text-[var(--ink-soft)]">
-                  {job.resumePath}
-                </p>
+                {/^\/api\/resumes\/[a-zA-Z0-9_-]+\/download$/.test(job.resumePath) ? (
+                  <a className="paper-link mt-2 inline-block text-xs" download href={job.resumePath}>Download Markdown</a>
+                ) : null}
               </div>
             ) : null}
 
@@ -528,10 +531,12 @@ export function TodayClient({
   jobs,
   highFitThreshold,
   initialShowHidden,
+  resumeCapability,
 }: {
   jobs: TodayJobItem[];
   highFitThreshold: number;
   initialShowHidden: boolean;
+  resumeCapability: { enabled: boolean; reason: string | null };
 }) {
   const [items, setItems] = useState(jobs);
   const [filter, setFilter] = useState<FilterMode>("all");
@@ -739,6 +744,7 @@ export function TodayClient({
           {visibleJobs.map((job) => (
             <TodayCard
               highFitThreshold={highFitThreshold}
+              resumeCapability={resumeCapability}
               isOpen={openIds.has(job.jobId)}
               job={job}
               key={job.recommendationId}

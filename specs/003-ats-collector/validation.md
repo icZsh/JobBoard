@@ -16,7 +16,7 @@ The original 18-source smoke run returned 17 successful feeds and a 404 for What
 
 The final run successfully fetched all 18 configured feeds and observed **3,115 unique postings**, of which **13 passed the rules** and the top **12** formed the combined shortlist. The resulting payload passed the existing importer schema. Final artifacts remain locally at:
 
-`/Users/isaaczhu/JobBoard-ats-collector/.collector-output/runs/2026-09-05T19-32-52.190Z-a480c5eb/`
+`/Users/isaaczhu/JobBoard-self-hosted/.collector-output/runs/2026-09-05T19-32-52.190Z-a480c5eb/`
 
 The ignored output directory also retains the earlier partial-run diagnostics and independent observation ledger. Results are a point-in-time snapshot, not a claim that future requests return the same openings.
 

@@ -1,8 +1,7 @@
-import { readFile, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { getLatestRecommendation } from "@/lib/jobs/recommendations";
 import { updateJobTracking } from "@/lib/jobs/tracking";
 import { prisma } from "@/lib/prisma";
-import { getSettingsValues } from "@/lib/settings";
 import { ResumeTailoringError } from "./errors";
 import {
   assertTextResumePath,
@@ -13,6 +12,7 @@ import { writeTailoredResumeFile } from "./output";
 import { buildResumeTailoringPrompt } from "./prompt";
 import { callGeminiResumeTailor } from "./gemini-client";
 import type { TailoredResumeResponse } from "./schema";
+import { getActiveResume, saveGeneratedResume } from "./files";
 
 const MIN_TAILORED_MARKDOWN_CHARS = 80;
 
@@ -56,7 +56,7 @@ type ResumeTailoringJob = {
   recommendations: ResumeTailoringRecommendation[];
 };
 
-type ResumeTailoringSettings = Awaited<ReturnType<typeof getSettingsValues>>;
+type ResumeTailoringSettings = { resumeFilePath: string; highFitThreshold: number };
 type TailoredResumeFileWriter = typeof writeTailoredResumeFile;
 
 export type TailorResumeResult = {
@@ -68,6 +68,8 @@ export type TailorResumeResult = {
 
 export type TailorResumeDeps = {
   now?: () => Date;
+  getConfirmedResume?: () => Promise<{ confirmedText: string | null; confirmedAt: Date | null } | null>;
+  saveGeneratedResume?: typeof saveGeneratedResume;
   getSettingsValues?: () => Promise<ResumeTailoringSettings>;
   getJob?: (jobId: string) => Promise<ResumeTailoringJob | null>;
   readTextFile?: (filePath: string) => Promise<string>;
@@ -79,10 +81,6 @@ export type TailorResumeDeps = {
   ) => Promise<unknown>;
   deleteTextFile?: (filePath: string) => Promise<void>;
 };
-
-async function defaultReadTextFile(filePath: string) {
-  return readFile(filePath, "utf8");
-}
 
 function recommendationHasContext(
   recommendation: ResumeTailoringJob["recommendations"][number] | null,
@@ -115,9 +113,7 @@ export async function tailorResumeForJob(
   deps: TailorResumeDeps = {},
 ): Promise<TailorResumeResult> {
   const now = deps.now ?? (() => new Date());
-  const loadSettings = deps.getSettingsValues ?? getSettingsValues;
   const loadJob = deps.getJob ?? defaultGetJob;
-  const readTextFile = deps.readTextFile ?? defaultReadTextFile;
   const callGemini = deps.callGemini ?? callGeminiResumeTailor;
   const writeFile = deps.writeTailoredResumeFile ?? writeTailoredResumeFile;
   const persistTracking = deps.updateTracking ?? updateJobTracking;
@@ -129,27 +125,20 @@ export async function tailorResumeForJob(
     throw new ResumeTailoringError("JOB_NOT_FOUND", "Job not found.");
   }
 
-  const settings = await loadSettings();
-  const resumeFilePath = settings.resumeFilePath.trim();
-
-  if (!resumeFilePath) {
-    throw new ResumeTailoringError(
-      "RESUME_NOT_CONFIGURED",
-      "Configure a Markdown base resume path in Settings before tailoring.",
-    );
-  }
-
-  assertTextResumePath(resumeFilePath);
-
   let baseResumeText: string;
-  try {
-    baseResumeText = await readTextFile(resumeFilePath);
-  } catch (error) {
-    throw new ResumeTailoringError(
-      "RESUME_UNREADABLE",
-      "The configured resume file could not be read.",
-      error,
-    );
+  // Preserve explicit test seams without providing a production filesystem-path fallback.
+  const legacyInjectedInput = deps.getSettingsValues && deps.readTextFile && !deps.getConfirmedResume;
+  if (legacyInjectedInput) {
+    const settings = await deps.getSettingsValues!();
+    assertTextResumePath(settings.resumeFilePath);
+    try { baseResumeText = await deps.readTextFile!(settings.resumeFilePath); }
+    catch (error) { throw new ResumeTailoringError("RESUME_UNREADABLE", "The resume could not be read.", error); }
+  } else {
+    const resume = await (deps.getConfirmedResume ?? getActiveResume)();
+    if (!resume?.confirmedAt || !resume.confirmedText?.trim()) {
+      throw new ResumeTailoringError("RESUME_NOT_CONFIGURED", "Upload, review, and confirm your resume in Settings before tailoring.");
+    }
+    baseResumeText = resume.confirmedText;
   }
 
   const baseResumeMarkdown = normalizeResumeForPrompt(baseResumeText);
@@ -175,7 +164,8 @@ export async function tailorResumeForJob(
       description,
       sourceUrl: job.sourceUrl,
     },
-    recommendation: latestRecommendation
+    // Imported fit assessments can belong to a different candidate; they are not resume evidence.
+    recommendation: legacyInjectedInput && latestRecommendation
       ? {
           fitScore: latestRecommendation.fitScore,
           matchedSkills: latestRecommendation.matchedSkills,
@@ -189,6 +179,17 @@ export async function tailorResumeForJob(
 
   const tailored = await callGemini(prompt);
   ensureTailoredMarkdownQuality(tailored.markdown);
+
+  if (!deps.writeTailoredResumeFile) {
+    try {
+      const written = await (deps.saveGeneratedResume ?? saveGeneratedResume)({
+        jobId, company: job.company, title: job.title, markdown: tailored.markdown, now: now(),
+      });
+      return { ...written, warnings: tailored.warnings, changes: tailored.changes };
+    } catch (error) {
+      throw new ResumeTailoringError("OUTPUT_WRITE_FAILED", "The tailored resume could not be saved.", error);
+    }
+  }
 
   const written = await writeFile({
     company: job.company,

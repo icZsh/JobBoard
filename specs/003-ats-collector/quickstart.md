@@ -1,6 +1,6 @@
 # Independent ATS collector quickstart
 
-This feature lives in `/Users/isaaczhu/JobBoard-ats-collector` on `feature/ats-collector`. It does not replace the current Codex daily task, vault exports, import LaunchAgent or active JobBoard. No scheduler has been installed.
+This feature lives in `/Users/isaaczhu/JobBoard-self-hosted` on `feature/docker-self-hosting`. It does not replace the current Codex daily task, vault exports, import LaunchAgent or active JobBoard. No scheduler has been installed.
 
 ## Collect and review
 

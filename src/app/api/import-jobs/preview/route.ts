@@ -2,11 +2,13 @@ import {
   MinimumEnvelopeError,
   previewImportPayload,
 } from "@/lib/import/import-service";
+import { requireApiAdmin } from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const denied = await requireApiAdmin(request); if (denied) return denied;
   let payload: unknown;
 
   try {

@@ -8,16 +8,19 @@ datasource db {
 }
 
 model ImportRun {
-  id           String          @id @default(cuid())
-  runDate      DateTime        @map("run_date") @db.Date
-  sourceName   String?         @map("source_name")
-  status       ImportRunStatus @default(PENDING)
-  rawPayload   Json            @map("raw_payload")
-  errorMessage String?         @map("error_message")
-  notes        String?
-  createdAt    DateTime        @default(now()) @map("created_at")
+  id             String          @id @default(cuid())
+  runDate        DateTime        @map("run_date") @db.Date
+  sourceName     String?         @map("source_name")
+  status         ImportRunStatus @default(PENDING)
+  rawPayload     Json            @map("raw_payload")
+  errorMessage   String?         @map("error_message")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  idempotencyKey String?         @unique @map("idempotency_key")
+  result         Json?
 
   recommendations JobRecommendation[]
+  collectionRun   CollectionRun?
 
   @@index([runDate, createdAt])
   @@map("import_runs")
@@ -131,6 +134,63 @@ model UserSession {
   @@index([userId])
   @@index([expiresAt])
   @@map("user_sessions")
+}
+
+model Bootstrap {
+  id        String   @id @default("admin")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("bootstrap")
+}
+
+model CollectionConfig {
+  id        String   @id @default("default")
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("collection_config")
+}
+
+model CollectionRun {
+  id             String    @id @default(cuid())
+  runKey         String    @unique @map("run_key")
+  trigger        String
+  status         String    @default("QUEUED")
+  configSnapshot Json      @map("config_snapshot")
+  scheduledFor   DateTime? @map("scheduled_for")
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  heartbeatAt    DateTime? @map("heartbeat_at")
+  attempts       Int       @default(0)
+  report         Json?
+  payload        Json?
+  error          String?
+  importRunId    String?   @unique @map("import_run_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  importRun ImportRun? @relation(fields: [importRunId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("collection_runs")
+}
+
+model ResumeFile {
+  id            String    @id @default(cuid())
+  kind          String    @default("ORIGINAL")
+  originalName  String    @map("original_name")
+  storageKey    String    @unique @map("storage_key")
+  mimeType      String    @map("mime_type")
+  size          Int
+  extractedText String?   @map("extracted_text")
+  confirmedText String?   @map("confirmed_text")
+  confirmedAt   DateTime? @map("confirmed_at")
+  jobId         String?   @map("job_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([jobId, createdAt])
+  @@map("resume_files")
 }
 
 enum JobStatus {

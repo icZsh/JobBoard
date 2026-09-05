@@ -26,6 +26,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getHighFitThreshold } from "@/lib/settings";
 import { TrackingForm } from "./tracking-form";
+import { requireAdmin } from "@/lib/auth/authorization";
+import { getResumeCapability } from "@/lib/resume/files";
 
 export const dynamic = "force-dynamic";
 
@@ -122,10 +124,12 @@ function SkillChips({
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = await params;
+  await requireAdmin(`/jobs/${encodeURIComponent(id)}`);
 
-  const [job, highFitThreshold] = await Promise.all([
+  const [job, highFitThreshold, resumeCapability] = await Promise.all([
     getJob(id),
     getHighFitThreshold(),
+    getResumeCapability(),
   ]);
 
   if (!job) {
@@ -360,6 +364,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
           </div>
 
           <TrackingForm
+            resumeCapability={resumeCapability}
             initial={{
               status,
               notes: tracking?.notes ?? "",

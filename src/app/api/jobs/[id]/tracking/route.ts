@@ -1,5 +1,6 @@
 import { trackingPatchSchema } from "@/lib/jobs/tracking-validation";
 import { updateJobTracking } from "@/lib/jobs/tracking";
+import { requireApiAdmin } from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const denied = await requireApiAdmin(request);
+  if (denied) return denied;
   const { id } = await context.params;
   let payload: unknown;
 
@@ -39,7 +42,11 @@ export async function PATCH(
   }
 
   try {
-    const tracking = await updateJobTracking(id, parsed.data);
+    const changes = { ...parsed.data };
+    // Resume associations are written only by the managed resume service.
+    delete changes.resumePath;
+    delete changes.resumeVersion;
+    const tracking = await updateJobTracking(id, changes);
     return Response.json({ ok: true, tracking });
   } catch (error) {
     const errorMessage =

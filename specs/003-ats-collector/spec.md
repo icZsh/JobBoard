@@ -1,6 +1,6 @@
 # Independent ATS Collector
 
-Branch: `feature/ats-collector` · Date: 2026-09-05
+Branch: `feature/docker-self-hosting` · Date: 2026-09-05
 
 ## Intent and scope
 

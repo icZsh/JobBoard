@@ -38,6 +38,7 @@ export interface CollectorRules {
   usRemotePatterns: string[];
   excludedCompanyPatterns: string[];
   skills: string[];
+  minExperienceYears?: number;
   maxExperienceYears: number;
   maxPostingAgeDays: number;
   preferredSalaryMin: number;

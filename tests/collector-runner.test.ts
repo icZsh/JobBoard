@@ -70,8 +70,10 @@ test("disabled sources are not requested or reconciled, and concurrency is bound
 });
 
 test("uses local calendar date, validates real dates and rejects corrupted ledger", async () => {
-  const result = await collect({ config: config(), now: new Date("2026-09-06T01:00:00Z"), fetchSource: async () => [] });
-  assert.equal(result.payload.run_date, "2026-09-05");
+  const timestamp = new Date("2026-09-06T01:00:00Z");
+  const localDate = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(timestamp);
+  const result = await collect({ config: config(), now: timestamp, fetchSource: async () => [] });
+  assert.equal(result.payload.run_date, localDate);
   await assert.rejects(collect({ config: config(), now, runDate: "2026-02-30", fetchSource: async () => [] }), /date/i);
   assert.deepEqual(parseState(emptyState()), emptyState());
   assert.throws(() => parseState({ version: 1, postings: { broken: {} } }));

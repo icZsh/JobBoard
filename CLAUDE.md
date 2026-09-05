@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The repo contains the initial Next.js scaffold plus Prisma/Postgres database foundation. Implementation work still starts from `PRD.md` and `SPEC.md` — read both before making non-trivial changes. `SPEC.md` is the source of truth for the data model, import contract, routes, and dedupe rules; `PRD.md` is the source of truth for user-facing behavior and scope.
 
+## Docker self-hosting branch
+
+The current feature extends the original V1 with single-admin authentication, a database-backed collector worker and confirmed resume uploads. Read `SELF_HOSTING.md` and `specs/004-docker-self-hosting/` for the current contracts. Use only `compose.selfhost.yml` and isolated test projects for this work. The original local startup configuration, main checkout, scheduled task, LaunchAgents, Vault and production database must remain unchanged. Historical V1 descriptions below do not override the self-hosting additions in PRD/SPEC.
+
 ## Intended Stack (from SPEC.md)
 
 - Next.js + TypeScript + Tailwind CSS

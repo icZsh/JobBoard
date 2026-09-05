@@ -95,13 +95,14 @@ export function evaluatePosting(posting: CollectorPosting, rules: CollectorRules
   else exclude("location is outside target cities or US remote eligibility is unverified");
 
   const experience = experienceEvidence(posting.description);
+  const minimumExperience = rules.minExperienceYears ?? 2;
   if (experience.minimum === null) concerns.push("Required minimum experience is unverified or unclear; review the original qualifications.");
   else if (experience.minimum > rules.maxExperienceYears) exclude(`required minimum experience ${experience.minimum} years exceeds configured maximum ${rules.maxExperienceYears}`);
-  else if (experience.minimum >= 2 && experience.minimum <= 4) addScore(10, `required minimum experience ${experience.minimum} years matches the 2–4 year target`);
-  else if (experience.minimum >= 5) {
+  else if (experience.minimum >= minimumExperience && experience.minimum < rules.maxExperienceYears) addScore(10, `required minimum experience ${experience.minimum} years matches the configured ${minimumExperience}–${rules.maxExperienceYears} year preference`);
+  else if (experience.minimum === rules.maxExperienceYears) {
     addScore(3, `required minimum experience ${experience.minimum} years is within the configured maximum`);
     concerns.push(`Required minimum ${experience.minimum} years is at the experience boundary; verify suitability.`);
-  } else { addScore(-5, `required minimum experience ${experience.minimum} years is below the 2–4 year preference`); concerns.push("The stated experience minimum may indicate an earlier-career role."); }
+  } else { addScore(-5, `required minimum experience ${experience.minimum} years is below the configured ${minimumExperience} year preference`); concerns.push("The stated experience minimum may indicate an earlier-career role."); }
   if (experience.preferred.some((years) => years > rules.maxExperienceYears)) concerns.push(`Preferred experience exceeds ${rules.maxExperienceYears} years; treated as a preference, not a required minimum.`);
   if (experience.alternatives) concerns.push("Experience requirements include alternative qualification paths; verify the applicable path.");
   if (experience.ambiguous && experience.minimum !== null) concerns.push("Additional experience wording has unclear required/preferred status; review the posting.");

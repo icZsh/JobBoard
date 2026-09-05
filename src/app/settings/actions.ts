@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { updateSettingsValues } from "@/lib/settings";
+import { requireAdmin, assertServerActionOrigin } from "@/lib/auth/authorization";
+import { prisma } from "@/lib/prisma";
 
 function getFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -10,23 +11,22 @@ function getFormString(formData: FormData, key: string) {
 }
 
 export async function saveSettings(formData: FormData) {
-  const resumeFilePath = getFormString(formData, "resumeFilePath");
-  const thresholdValue = Number.parseInt(
-    getFormString(formData, "highFitThreshold"),
-    10,
-  );
+  await requireAdmin("/settings");
+  await assertServerActionOrigin();
+  const thresholdValue = Number(getFormString(formData, "highFitThreshold"));
 
   if (
-    !Number.isFinite(thresholdValue) ||
+    !Number.isInteger(thresholdValue) ||
     thresholdValue < 1 ||
     thresholdValue > 100
   ) {
     redirect("/settings?error=high-fit-threshold");
   }
 
-  await updateSettingsValues({
-    resumeFilePath,
-    highFitThreshold: thresholdValue,
+  await prisma.setting.upsert({
+    where: { key: "high_fit_threshold" },
+    create: { key: "high_fit_threshold", value: String(thresholdValue) },
+    update: { value: String(thresholdValue) },
   });
 
   revalidatePath("/settings");

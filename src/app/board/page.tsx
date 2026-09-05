@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/auth/authorization";
 import { JobStatus } from "@/generated/prisma/client";
 import { formatDateOnly } from "@/lib/format";
 import { getLatestRecommendation } from "@/lib/jobs/recommendations";
@@ -49,6 +50,7 @@ function toBoardItem(job: BoardJob): BoardJobItem {
 }
 
 export default async function BoardPage() {
+  await requireAdmin("/board");
   const jobs = await getBoardJobs();
   const items = jobs.map(toBoardItem);
   const activeCount = items.filter(

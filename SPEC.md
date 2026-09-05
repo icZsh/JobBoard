@@ -24,6 +24,12 @@ The optional TypeScript CLI under `scripts/collector/` runs outside the request-
 
 Collection writes to `.collector-output/` by default, never the current daily automation's vault directory. A separate command takes an explicit loopback `/api/import-jobs` endpoint; there is no implicit production URL, automatic POST, or activated schedule. Only a nonempty batch with all configured sources successfully fetched is eligible for that command. Successful target+payload hashes suppress duplicate POSTs, and ambiguous requests retain pending state for reconciliation. Today continues receiving a single combined batch. Source failures must not mark jobs missing, and missing feed membership must not be represented as confirmed closure. See `specs/003-ats-collector/` for detailed behavior and tests.
 
+## Docker self-hosting contract (post-V1)
+
+The separate `compose.selfhost.yml` starts PostgreSQL, one-shot `prisma migrate deploy`, Next web and a compiled worker. `CollectionConfig.value` holds validated web preferences and derived collector settings; `CollectionRun` captures immutable configuration, durable publication payload, source report, state and an optional unique import relation. `ImportRun.idempotencyKey` and saved `result` are optional: existing imports retain their contract, while worker replays return the same committed result. Existing job tracking remains untouched on repeated imports.
+
+`Bootstrap` makes single-admin creation atomic. `User`/`UserSession` protect pages, APIs and server actions; state-changing browser requests require same-origin checks. `ResumeFile` identifies original and generated files in `DATA_DIR`; only confirmed text selected by `settings.activeResumeId` supplies candidate facts. No arbitrary server paths are needed in the self-hosted web flow. Keys stay in the environment. The historical V1 auth/upload exclusions below describe the original deployment and are superseded by this opt-in feature. Schema, lifecycle, recovery and retention details are in `specs/004-docker-self-hosting/`.
+
 ## Recommended Stack
 
 - Next.js.

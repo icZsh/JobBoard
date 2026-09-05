@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/auth/authorization";
+import { getCollectionConfig } from "@/lib/selfhost/config";
+import { CollectionStatus } from "./collection-status";
+import { getResumeCapability } from "@/lib/resume/files";
 import { ImportRunStatus, JobStatus } from "@/generated/prisma/client";
 import { formatDateOnly, formatSalary, formatTimestamp } from "@/lib/format";
 import { getCompanyWebsiteUrl } from "@/lib/jobs/company-website";
@@ -28,7 +32,6 @@ type TodayPageProps = {
 
 const hiddenStatuses = new Set<string>([JobStatus.PASSED, JobStatus.ARCHIVED]);
 const RECENT_RUN_DAY_COUNT = 7;
-const REVIEW_TIME_ZONE = "America/Los_Angeles";
 
 function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -85,9 +88,9 @@ function getRunDateKey(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
-function getLocalDateKey(value: Date) {
+function getLocalDateKey(value: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: REVIEW_TIME_ZONE,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -99,12 +102,12 @@ function getLocalDateKey(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getTodayTitle(selectedRun: { runDate: Date } | null) {
+function getTodayTitle(selectedRun: { runDate: Date } | null, timeZone: string) {
   if (!selectedRun) {
     return "Today";
   }
 
-  return getRunDateKey(selectedRun.runDate) === getLocalDateKey(new Date())
+  return getRunDateKey(selectedRun.runDate) === getLocalDateKey(new Date(), timeZone)
     ? "Today"
     : formatDateOnly(selectedRun.runDate);
 }
@@ -297,7 +300,10 @@ function EmptyState({
 }
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
+  await requireAdmin("/today");
+  const timeZone = (await getCollectionConfig())?.timezone ?? "UTC";
   const params = await searchParams;
+  const resumeCapability = await getResumeCapability();
   const includeHidden = getSingleParam(params.includeHidden) === "1";
   const requestedRunId = getSingleParam(params.runId);
   const [
@@ -338,7 +344,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const subline = selectedRun
     ? `${formatDateOnly(selectedRun.runDate)} · ${applyTodayCount} to apply today`
     : "Latest recommendations will appear here after an import.";
-  const pageTitle = getTodayTitle(selectedRun);
+  const pageTitle = getTodayTitle(selectedRun, timeZone);
 
   return (
     <main className="paper-app">
@@ -378,6 +384,8 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           </div>
         </header>
 
+        <CollectionStatus />
+
         {latestRunOverall?.status === ImportRunStatus.FAILED && !requestedRun ? (
           <EmptyState title="Latest import failed">
             <p>{latestRunOverall.errorMessage ?? "No error message was saved."}</p>
@@ -393,10 +401,10 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
         ) : null}
 
         {!latestRunOverall ? (
-          <EmptyState title="No imports yet">
-            <p>Import a daily recommendation payload to start reviewing jobs.</p>
+          <EmptyState title="No recommendations yet">
+            <p>Start a collection above. If a completed collection has no matches, adjust your search preferences.</p>
             <Link className="paper-btn mt-4" href="/import">
-              Import Jobs
+              Import a saved shortlist
             </Link>
           </EmptyState>
         ) : null}
@@ -410,6 +418,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
         {items.length > 0 ? (
           <TodayClient
             highFitThreshold={highFitThreshold}
+            resumeCapability={resumeCapability}
             initialShowHidden={includeHidden}
             jobs={items}
             key={selectedRun?.id}

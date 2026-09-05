@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdmin } from "@/lib/auth/authorization";
 import type { ReactNode } from "react";
 import {
   CalendarCheck,
@@ -82,6 +83,7 @@ function SidebarSection({
 }
 
 export default async function ImportPage() {
+  await requireAdmin("/import");
   const recentRuns = await getRecentImportRuns();
   const successfulRuns = recentRuns.filter(
     (run) => run.status === ImportRunStatus.SUCCESS,

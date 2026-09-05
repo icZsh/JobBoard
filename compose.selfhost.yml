@@ -1,0 +1,80 @@
+name: ${COMPOSE_PROJECT_NAME:-jobboard-selfhost}
+
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql://jobboard:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.selfhost}@db:5432/jobboard
+  DATA_DIR: /app/data
+  AUTH_COOKIE_SECURE: "false"
+  AUTH_INSTANCE_ID: ${COMPOSE_PROJECT_NAME:-jobboard-selfhost}
+
+x-app: &app
+  image: ${JOBBOARD_IMAGE:-jobboard-selfhost:local}
+  build:
+    context: .
+    dockerfile: Dockerfile.selfhost
+    target: runtime
+  init: true
+  restart: unless-stopped
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+  volumes:
+    - files:/app/data
+  stop_grace_period: 30s
+
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jobboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.selfhost}
+      POSTGRES_DB: jobboard
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobboard -d jobboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: ${JOBBOARD_MIGRATION_IMAGE:-jobboard-selfhost-migrate:local}
+    build:
+      context: .
+      dockerfile: Dockerfile.selfhost
+      target: migrate
+    environment: *app-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    <<: *app
+    environment:
+      <<: *app-environment
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_RESUME_MODEL: ${GEMINI_RESUME_MODEL:-gemini-3.1-pro-preview}
+    ports:
+      - "127.0.0.1:${JOBBOARD_PORT:-3010}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    <<: *app
+    environment: *app-environment
+    command: ["node", "dist/worker.mjs"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs');try{process.exit(Date.now()-Number(fs.readFileSync('/tmp/jobboard-worker-heartbeat','utf8'))<120000?0:1)}catch{process.exit(1)}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  database:
+  files:
