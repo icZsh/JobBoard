@@ -34,17 +34,24 @@ Local web app
 - Database runs locally or through a local Docker Postgres container.
 - The daily automation produces structured JSON.
 - The app supports both JSON file import and API import.
-- The resume is referenced by local file path only.
+- The base resume is referenced by local file path only. Resume tailoring V1 expects Markdown/plain text and rejects PDF/Office/image/binary inputs before generation.
 
 ## Environment Variables
 
 ```bash
-DATABASE_URL="postgresql://jobboard:jobboard@localhost:5432/jobboard"
-RESUME_FILE_PATH="/Users/isaaczhu/path/to/resume.pdf"
+DATABASE_URL="postgresql://jobboard:***@localhost:5432/jobboard"
+RESUME_FILE_PATH="/Users/isaaczhu/Isaac's Vault/Jobs/Resumes/Resume-Isaac Zhu.md"
 HIGH_FIT_THRESHOLD="80"
+GEMINI_API_KEY="your_gemini_api_key_here"
+# Optional fallback/override values:
+GOOGLE_API_KEY="your_google_api_key_here"
+GEMINI_RESUME_MODEL="gemini-3.1-pro"
+TAILORED_RESUME_ROOT="/Users/isaaczhu/Isaac's Vault/Jobs/Resumes/Tailored"
 ```
 
 `RESUME_FILE_PATH` and `HIGH_FIT_THRESHOLD` are **seed values only**. On first run, the app writes them into the `settings` table if those rows do not already exist. After that, the `settings` table is the source of truth; changing the env vars has no effect. The Settings UI edits the DB rows.
+
+`GEMINI_API_KEY`, optional `GOOGLE_API_KEY`, `GEMINI_RESUME_MODEL`, and `TAILORED_RESUME_ROOT` are runtime environment values for the post-V1 resume tailoring feature. API keys must stay in `.env`; they are not database settings.
 
 ## Core Domain Model
 
@@ -458,6 +465,7 @@ Controls:
 
 - Include Passed/Archived toggle.
 - Status quick actions.
+- Open the matching posting detail page from the job title in a new tab.
 - Open detail.
 
 Empty / degenerate states:
@@ -597,6 +605,7 @@ Required visible fields:
 
 Required actions:
 
+- Open matching posting detail page from the title in a new tab.
 - Interested.
 - Applying.
 - Applied.

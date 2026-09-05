@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  AlertTriangle,
+  ArrowRight,
+  BadgeCheck,
+  CheckCircle2,
+  Eye,
+  FileInput,
+  FileJson,
+  Upload,
+  XCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
 import type {
@@ -31,9 +42,11 @@ function SummaryCell({
   value: number | string;
 }) {
   return (
-    <div className="border border-slate-200 bg-white p-3">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
+    <div className="paper-card p-5">
+      <p className="paper-label">{label}</p>
+      <p className="mt-2 font-mono text-2xl font-semibold text-[var(--ink)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -45,7 +58,8 @@ function RowStatus({
 }) {
   if (row.errors.length > 0) {
     return (
-      <span className="border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">
+      <span className="paper-badge badge-pass">
+        <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
         Invalid
       </span>
     );
@@ -53,7 +67,8 @@ function RowStatus({
 
   if (row.duplicateInPayload) {
     return (
-      <span className="border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+      <span className="paper-badge badge-high">
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
         Payload Duplicate
       </span>
     );
@@ -61,14 +76,16 @@ function RowStatus({
 
   if (row.existingJobId) {
     return (
-      <span className="border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700">
+      <span className="paper-badge badge-fit">
+        <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
         Existing
       </span>
     );
   }
 
   return (
-    <span className="border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+    <span className="paper-badge badge-apply">
+      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
       New
     </span>
   );
@@ -186,25 +203,43 @@ export function ImportClient() {
   }
 
   return (
-    <section className="grid gap-4">
-      <div className="border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <label className="inline-flex h-10 cursor-pointer items-center justify-center border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-400">
-            <input
-              accept="application/json,.json"
-              className="sr-only"
-              onChange={handleFileChange}
-              type="file"
-            />
-            Choose JSON
-          </label>
-          {fileName ? (
-            <p className="text-sm text-slate-600">{fileName}</p>
-          ) : null}
+    <section className="grid gap-5">
+      <div className="paper-card">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] text-[var(--accent-ink)]">
+              <FileJson className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="paper-label">Payload</p>
+              <h2 className="mt-1 text-xl font-bold text-[var(--ink)]">
+                Daily Job JSON
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {fileName ? (
+              <span className="paper-badge badge-neutral">
+                <FileInput className="h-3.5 w-3.5" aria-hidden="true" />
+                {fileName}
+              </span>
+            ) : null}
+            <label className="paper-btn cursor-pointer">
+              <input
+                accept="application/json,.json"
+                className="sr-only"
+                onChange={handleFileChange}
+                type="file"
+              />
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              Choose JSON
+            </label>
+          </div>
         </div>
 
         <textarea
-          className="mt-4 min-h-80 w-full resize-y border border-slate-200 bg-white p-3 font-mono text-sm text-slate-900"
+          className="paper-textarea paper-json-textarea mt-6 font-mono text-[12.5px]"
           onChange={(event) => {
             setJsonText(event.target.value);
             setImportResult(null);
@@ -215,28 +250,30 @@ export function ImportClient() {
           value={jsonText}
         />
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--hair)] pt-5">
           <button
-            className="h-10 border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="paper-btn"
             disabled={!jsonText.trim() || isPreviewing}
             onClick={handlePreview}
             type="button"
           >
+            <Eye className="h-4 w-4" aria-hidden="true" />
             {isPreviewing ? "Previewing" : "Preview"}
           </button>
           <button
-            className="h-10 border border-slate-900 bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
+            className="paper-btn paper-btn-solid"
             disabled={!canConfirm}
             onClick={handleConfirm}
             type="button"
           >
             {isImporting ? "Importing" : "Confirm Import"}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {errorMessage ? (
-        <div className="border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-700">
+        <div className="rounded-[var(--radius-ctl)] border border-[var(--pass-border)] bg-[var(--pass-bg)] px-4 py-3 text-sm font-semibold text-[var(--pass-ink)]">
           {errorMessage}
         </div>
       ) : null}
@@ -245,13 +282,13 @@ export function ImportClient() {
       !importResult.ok &&
       "importRunId" in importResult &&
       importResult.importRunId ? (
-        <div className="border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+        <div className="rounded-[var(--radius-ctl)] border border-[var(--high-border)] bg-[var(--high-bg)] px-4 py-3 text-sm font-semibold text-[var(--high-ink)]">
           Failed run saved: {importResult.importRunId}
         </div>
       ) : null}
 
       {preview ? (
-        <div className="grid gap-4">
+        <div className="grid gap-5">
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCell label="Jobs" value={preview.totalJobs} />
             <SummaryCell label="New" value={preview.newJobs} />
@@ -259,26 +296,32 @@ export function ImportClient() {
             <SummaryCell label="Invalid" value={preview.invalidJobs} />
           </section>
 
-          <section className="border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 md:flex-row md:items-center md:justify-between">
+          <section className="paper-card">
+            <div className="flex flex-col gap-3 border-b border-[var(--hair)] pb-5 md:flex-row md:items-start md:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-950">
-                  Preview
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="paper-label">Preview</p>
+                <h2 className="mt-1 text-xl font-bold text-[var(--ink)]">
                   {preview.runDate}
-                  {preview.sourceName ? ` · ${preview.sourceName}` : ""}
-                </p>
+                </h2>
+                {preview.sourceName ? (
+                  <p className="mt-2 font-mono text-xs text-[var(--ink-faint)]">
+                    {preview.sourceName}
+                  </p>
+                ) : null}
               </div>
-              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                <span>{preview.wouldImportJobs} unique</span>
-                <span>{preview.inPayloadDuplicates} payload duplicates</span>
+              <div className="paper-row">
+                <span className="paper-badge badge-neutral">
+                  {preview.wouldImportJobs} unique
+                </span>
+                <span className="paper-badge badge-high">
+                  {preview.inPayloadDuplicates} payload duplicates
+                </span>
               </div>
             </div>
 
             {preview.validationErrors.length > 0 ? (
-              <div className="mt-4 border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-                <p className="font-semibold">Validation errors</p>
+              <div className="mt-5 rounded-[var(--radius-ctl)] border border-[var(--pass-border)] bg-[var(--pass-bg)] p-4 text-sm text-[var(--pass-ink)]">
+                <p className="font-bold">Validation errors</p>
                 <ul className="mt-2 grid gap-1">
                   {preview.validationErrors.slice(0, 8).map((error) => (
                     <li key={`${error.path}-${error.message}`}>
@@ -289,39 +332,41 @@ export function ImportClient() {
               </div>
             ) : null}
 
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-5 overflow-x-auto">
               <table className="w-full min-w-[720px] border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
-                    <th className="py-2 pr-3 font-semibold">Row</th>
-                    <th className="py-2 pr-3 font-semibold">Job</th>
-                    <th className="py-2 pr-3 font-semibold">Company</th>
-                    <th className="py-2 pr-3 font-semibold">Fit</th>
-                    <th className="py-2 pr-3 font-semibold">Status</th>
+                  <tr className="border-b border-[var(--hair)]">
+                    <th className="paper-label py-3 pr-3">Row</th>
+                    <th className="paper-label py-3 pr-3">Job</th>
+                    <th className="paper-label py-3 pr-3">Company</th>
+                    <th className="paper-label py-3 pr-3">Fit</th>
+                    <th className="paper-label py-3 pr-3">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.rows.slice(0, 25).map((row) => (
                     <tr
-                      className="border-b border-slate-100 last:border-0"
+                      className="border-b border-[var(--hair)] last:border-0"
                       key={row.index}
                     >
-                      <td className="py-3 pr-3 text-slate-600">{row.index}</td>
-                      <td className="max-w-xs py-3 pr-3 font-medium text-slate-900">
+                      <td className="py-4 pr-3 font-mono text-xs text-[var(--ink-faint)]">
+                        {row.index}
+                      </td>
+                      <td className="max-w-xs py-4 pr-3 font-semibold text-[var(--ink)]">
                         {row.title ?? "Untitled"}
                         {row.errors.length > 0 ? (
-                          <p className="mt-1 text-xs font-normal text-rose-700">
+                          <p className="mt-1 text-xs font-normal leading-5 text-[var(--pass-ink)]">
                             {row.errors.join("; ")}
                           </p>
                         ) : null}
                       </td>
-                      <td className="py-3 pr-3 text-slate-700">
+                      <td className="py-4 pr-3 text-[var(--ink-soft)]">
                         {row.company ?? "Unknown"}
                       </td>
-                      <td className="py-3 pr-3 text-slate-700">
+                      <td className="py-4 pr-3 font-mono text-xs text-[var(--ink-soft)]">
                         {row.fitScore ?? "Not scored"}
                       </td>
-                      <td className="py-3 pr-3">
+                      <td className="py-4 pr-3">
                         <RowStatus row={row} />
                       </td>
                     </tr>

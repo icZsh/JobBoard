@@ -122,6 +122,7 @@ function SkillChips({
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = await params;
+
   const [job, highFitThreshold] = await Promise.all([
     getJob(id),
     getHighFitThreshold(),

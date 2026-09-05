@@ -270,6 +270,52 @@ body::before {
   width: 210px;
 }
 
+.paper-date-select {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--radius-ctl);
+  display: inline-flex;
+  height: 38px;
+  max-width: 100%;
+  min-width: 225px;
+  position: relative;
+}
+
+.paper-date-select select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: "Spline Sans Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  height: 100%;
+  outline: 0;
+  padding: 0 35px 0 38px;
+  width: 100%;
+}
+
+.paper-date-select-icon,
+.paper-date-select-caret {
+  color: var(--ink-faint);
+  pointer-events: none;
+  position: absolute;
+}
+
+.paper-date-select-icon {
+  height: 16px;
+  left: 13px;
+  width: 16px;
+}
+
+.paper-date-select-caret {
+  height: 15px;
+  right: 12px;
+  width: 15px;
+}
+
 .paper-badge {
   align-items: center;
   border: 1px solid var(--hair-strong);
@@ -382,6 +428,10 @@ body::before {
   line-height: 1.5;
   min-height: 86px;
   resize: vertical;
+}
+
+.paper-json-textarea {
+  min-height: 220px;
 }
 
 .paper-input:focus,

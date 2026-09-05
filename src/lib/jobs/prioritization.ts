@@ -25,7 +25,7 @@ export function isApplyTodayJob(input: {
   const status = input.status ?? "";
   const canStillApply = !terminalApplyStatuses.has(status);
 
-  if (/\bapply\s*today\b/iu.test(suggestedAction)) {
+  if (/\bapply\s*today\b/iu.test(suggestedAction) && canStillApply) {
     return true;
   }
 
