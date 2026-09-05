@@ -1,0 +1,128 @@
+[
+  {
+    "provider": "ashby",
+    "board": "adonis",
+    "company": "Adonis",
+    "websiteUrl": "https://www.adonis.io/",
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "openai",
+    "company": "OpenAI",
+    "websiteUrl": "https://openai.com/",
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "imprint",
+    "company": "Imprint",
+    "websiteUrl": "https://www.imprint.co/",
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "lumaai",
+    "company": "Luma",
+    "websiteUrl": "https://lumalabs.ai/",
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "minerva",
+    "company": "Minerva",
+    "websiteUrl": "https://www.minerva.io/",
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "notion",
+    "company": "Notion",
+    "websiteUrl": null,
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "ramp",
+    "company": "Ramp",
+    "websiteUrl": null,
+    "enabled": true
+  },
+  {
+    "provider": "ashby",
+    "board": "decagon",
+    "company": "Decagon",
+    "websiteUrl": "https://decagon.ai/",
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "vercel",
+    "company": "Vercel",
+    "websiteUrl": "https://vercel.com/",
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "gruns",
+    "company": "Grüns",
+    "websiteUrl": "https://gruns.co/",
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "mill",
+    "company": "Mill",
+    "websiteUrl": "https://www.mill.com/",
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "figma",
+    "company": "Figma",
+    "websiteUrl": "https://www.figma.com/",
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "anthropic",
+    "company": "Anthropic",
+    "websiteUrl": null,
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "chime",
+    "company": "Chime",
+    "websiteUrl": "https://www.chime.com/",
+    "enabled": true
+  },
+  {
+    "provider": "greenhouse",
+    "board": "airtable",
+    "company": "Airtable",
+    "websiteUrl": null,
+    "enabled": true
+  },
+  {
+    "provider": "lever",
+    "board": "gopuff",
+    "company": "Gopuff",
+    "websiteUrl": "https://www.gopuff.com/",
+    "enabled": true
+  },
+  {
+    "provider": "lever",
+    "board": "gridware",
+    "company": "Gridware",
+    "websiteUrl": "https://www.gridware.io/",
+    "enabled": true
+  },
+  {
+    "provider": "lever",
+    "board": "spotify",
+    "company": "Spotify",
+    "websiteUrl": null,
+    "enabled": true
+  }
+]

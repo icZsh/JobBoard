@@ -2,6 +2,8 @@
 
 A local-only web application for importing daily job recommendations, reviewing high-fit roles, and tracking applications.
 
+An optional independent ATS collector is documented in [the collector quickstart](specs/003-ats-collector/quickstart.md). `npm run collector:collect` generates local review artifacts from 18 configured company boards; it does not import jobs or change existing scheduled tasks.
+
 ## Current Status
 
 The project currently has the base Next.js, TypeScript, Tailwind, ESLint, Prisma, and Postgres schema scaffold in place. The product and implementation contract lives in:

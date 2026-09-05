@@ -1,0 +1,55 @@
+{
+  "includeTitlePatterns": [
+    "\\b(?:data|analytics)\\s+(?:engineer|developer)\\b",
+    "\\b(?:business intelligence|bi)\\s+(?:engineer|developer)\\b",
+    "\\bdata[ -](?:platform|infrastructure)[ -]engineer\\b",
+    "\\b(?:software|backend|back end|platform)\\s+engineer\\b.*\\b(?:data|infrastructure|infra|analytics|machine learning|ml)\\b",
+    "\\b(?:data|infrastructure|infra|analytics|machine learning|ml)\\b.*\\b(?:software|backend|back end|platform)\\s+engineer\\b",
+    "\\b(?:machine learning|ml)\\s+(?:platform|infrastructure)\\s+engineer\\b",
+    "\\binfrastructure\\s+engineer\\b"
+  ],
+  "excludeTitlePatterns": [
+    "\\b(?:senior|sr|staff|principal|lead|manager|director|head|vp|vice president)\\b",
+    "\\b(?:intern|internship|contract|contractor|temporary|freelance|apprentice|junior|entry[ -]level)\\b",
+    "\\b(?:new[ -]?grad(?:uate)?|graduate)\\b"
+  ],
+  "locationPatterns": [
+    "\\bnew york(?: city)?\\b(?!\\s+(?:state|mills|england))",
+    "\\bnyc\\b",
+    "\\b(?:san francisco|sf bay)\\b|^bay area(?:,\\s*(?:ca|california|usa|united states))?$",
+    "\\b(?:san mateo|san jose|oakland|palo alto|menlo park|mountain view|redwood city|sunnyvale|santa clara|foster city|san bruno|berkeley|emeryville|cupertino|fremont|burlingame)\\b"
+  ],
+  "usRemotePatterns": [
+    "\\bremote\\b.*\\b(?:united states(?: of america)?|u\\.?s\\.?a?\\.?)(?=$|[\\s,;()/.-])",
+    "\\b(?:united states(?: of america)?|u\\.?s\\.?a?\\.?)(?=$|[\\s,;()/.-]).*\\bremote\\b"
+  ],
+  "excludedCompanyPatterns": [],
+  "skills": [
+    "Python",
+    "SQL",
+    "Spark",
+    "Hive",
+    "dbt",
+    "Airflow",
+    "Snowflake",
+    "BigQuery",
+    "Kafka",
+    "Flink",
+    "AWS",
+    "GCP",
+    "Azure",
+    "Databricks",
+    "Docker",
+    "Kubernetes",
+    "Terraform",
+    "Elasticsearch",
+    "Redshift",
+    "Trino"
+  ],
+  "maxExperienceYears": 5,
+  "maxPostingAgeDays": 30,
+  "preferredSalaryMin": 160000,
+  "minimumScore": 50,
+  "maxResults": 12,
+  "allowUnknownDate": true
+}

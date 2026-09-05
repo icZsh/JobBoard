@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.isaaczhu.jobboard-ats-collector-preview</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/ABSOLUTE/PATH/TO/node</string>
+    <string>/ABSOLUTE/PATH/TO/WORKTREE/node_modules/tsx/dist/cli.mjs</string>
+    <string>/ABSOLUTE/PATH/TO/WORKTREE/scripts/collector/collect.ts</string>
+    <string>--output</string><string>/ABSOLUTE/PATH/TO/WORKTREE/.collector-output</string>
+  </array>
+  <key>WorkingDirectory</key><string>/ABSOLUTE/PATH/TO/WORKTREE</string>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/ABSOLUTE/PATH/TO/WORKTREE/.collector-output/launchd.out.log</string>
+  <key>StandardErrorPath</key><string>/ABSOLUTE/PATH/TO/WORKTREE/.collector-output/launchd.err.log</string>
+</dict>
+</plist>

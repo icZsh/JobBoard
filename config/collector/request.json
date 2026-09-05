@@ -1,0 +1,5 @@
+{
+  "timeoutMs": 20000,
+  "retries": 2,
+  "concurrency": 3
+}

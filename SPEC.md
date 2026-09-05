@@ -18,6 +18,12 @@ Postgres database
 Local web app
 ```
 
+## Independent ATS collector contract (post-V1)
+
+The optional TypeScript CLI under `scripts/collector/` runs outside the request-serving app. Versioned JSON configuration defines company boards, request limits and deterministic screening rules. The normalized posting keeps stable provider/board/job identity, source dates with explicit evidence semantics, and annual USD salary only where supported. Output includes one merged `ats_collector_rules_v1` import payload, source diagnostics, a normalized snapshot and an independent first/last-observation ledger. Additional per-job `collector` metadata is preserved by the existing importer's raw-payload handling; no Prisma changes are required.
+
+Collection writes to `.collector-output/` by default, never the current daily automation's vault directory. A separate command takes an explicit loopback `/api/import-jobs` endpoint; there is no implicit production URL, automatic POST, or activated schedule. Only a nonempty batch with all configured sources successfully fetched is eligible for that command. Successful target+payload hashes suppress duplicate POSTs, and ambiguous requests retain pending state for reconciliation. Today continues receiving a single combined batch. Source failures must not mark jobs missing, and missing feed membership must not be represented as confirmed closure. See `specs/003-ats-collector/` for detailed behavior and tests.
+
 ## Recommended Stack
 
 - Next.js.

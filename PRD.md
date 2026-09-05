@@ -63,6 +63,10 @@ Isaac, using the app locally on his own machine.
 - Multi-user collaboration.
 - Hosted deployment.
 
+### Independent ATS collector (opt-in post-V1)
+
+An independent command-line collector may read public Ashby, Greenhouse and Lever boards for a curated, editable set of historical companies. It generates deterministic rule-ranked daily JSON and a review report in a separate local output directory. Collection does not write to the JobBoard database. Explicit import remains a separate action using the existing import contract. Existing scheduled recommendations, launch agents, vault files and personal tracking are unaffected. Scheduler examples are not installed or activated by development commands. Missing-from-feed observations are kept in collector artifacts and do not alter personal application status. See `specs/003-ats-collector/`.
+
 ### Security Assumption
 
 V1 is local-only and unauthenticated. The app should be served on localhost, should not enable broad CORS, and should treat export data as private personal data.
