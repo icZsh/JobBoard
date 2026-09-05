@@ -8,6 +8,10 @@ JobBoard collects from **Ashby, Greenhouse and Lever**, starting with 18 editabl
 
 [Quick start](#quick-start) · [First collection](#set-up-your-search-and-collect-jobs) · [Troubleshooting](#troubleshooting) · [Backup and upgrade guide](SELF_HOSTING.md)
 
+![Today showing collection results, source coverage, and recommended jobs](docs/images/today.jpg)
+
+*The English-language UI shown here uses public job listings and a demo account with illustrative application statuses. No personal user data is shown.*
+
 ## Quick start
 
 You need Docker running on your computer: Docker Desktop, or Docker Engine with the Compose and Buildx plugins. The first build downloads images and packages and may take several minutes. Collection also needs an internet connection to the selected company boards.
@@ -62,6 +66,15 @@ The web app is available only on the computer running Docker (`localhost`); the 
 4. **Review Company sources.** Expand the section to enable, remove or add companies. Keep at least one enabled. Only these companies are searched.
 5. Click **Create account and save preferences**, then **Collect jobs now** on Settings. Today shows the run progress, source coverage and resulting shortlist. You can also start a run with **Run now** on Today.
 
+<details>
+<summary>Preview first-time setup</summary>
+
+![First-time setup with administrator account fields and search preferences](docs/images/setup.jpg)
+
+Create your account and review the starter preferences before your first collection.
+
+</details>
+
 You can close the browser while collection runs. Keep Docker running and the host computer awake for scheduled collection. After downtime, the worker catches up on at most the most recent missed daily run.
 
 Salary and preferred minimum experience affect scoring; jobs above the maximum required experience are excluded. Missing source details are flagged for review. Scores reflect your saved preferences, not an AI assessment of your resume.
@@ -77,6 +90,15 @@ In **Settings → Company sources → Add company**, enter its name and company-
 | Lever | `https://jobs.lever.co/COMPANY` |
 
 Replace `COMPANY` with the company's actual board identifier. Use the board homepage without query parameters or a fragment. A company marketing site, individual job link, LinkedIn page or Workday URL is not supported.
+
+<details>
+<summary>Preview the schedule and company sources</summary>
+
+![Settings showing a 09:00 daily schedule in America/New_York and the first company board URLs](docs/images/settings.jpg)
+
+Choose your timezone and daily time, then enable or edit company sources.
+
+</details>
 
 ### Optional: upload a resume and enable tailoring
 
@@ -98,6 +120,19 @@ When you request tailoring for a job, the confirmed resume and job context are s
 | **Board** | Track applications, update statuses and keep notes. Later collections preserve this information. |
 | **Settings** | Edit preferences and companies. Click **Save preferences** before collecting; queued/running jobs keep their original settings. |
 | **Settings → Resume** | Upload, review, confirm and download managed resume files. |
+
+![Review flow changing a job from New to Interested on Today, then finding it on Board](docs/images/review-to-board.gif)
+
+*Mark a job Interested on Today, then continue tracking it on Board.*
+
+<details>
+<summary>View the application Board</summary>
+
+![Board showing jobs with example application statuses](docs/images/board.jpg)
+
+Example follow-up statuses on the application Board.
+
+</details>
 
 To pause the daily schedule, uncheck **Collect new jobs automatically each day** and save. This stops new scheduled runs; an existing queued/running collection can finish, and manual collection remains available.
 
