@@ -355,6 +355,13 @@ body::before {
   width: 15px;
 }
 
+/* iOS Safari zooms the page when a control under 16px gets focus. */
+@media (pointer: coarse) {
+  .paper-compact-select select {
+    font-size: 16px;
+  }
+}
+
 .paper-badge {
   align-items: center;
   border: 1px solid var(--hair-strong);

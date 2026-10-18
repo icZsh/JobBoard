@@ -90,10 +90,6 @@ export function isApplyTodayClient(job: TodayJobItem, highFitThreshold: number, 
   );
 }
 
-function isHighFitClient(job: TodayJobItem, highFitThreshold: number) {
-  return typeof job.fitScore === "number" && job.fitScore >= highFitThreshold;
-}
-
 export function matchesTodayFilter(
   job: TodayJobItem,
   filter: FilterMode,
@@ -138,8 +134,9 @@ function BadgeCluster({
     ? `${formatStatusLabel(job.priority)} priority`
     : null;
 
+  // Badges flow inline in the title row; an empty cluster renders no box.
   return (
-    <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+    <div className="contents">
       {!historicalReview && job.recommendationSuppressed ? (
         <span className="paper-badge badge-neutral">Hidden · history review</span>
       ) : null}
