@@ -88,7 +88,7 @@ Expected capabilities:
 - View latest recommended jobs.
 - See title, company, location, remote type, salary if available, fit score, priority, and recommendation context.
 - Open the matching posting detail page from a job title in a new tab so the daily review context stays available.
-- Highlight high-fit jobs.
+- Highlight high-fit jobs with the fit score ring, which shows each job's score and fit tier.
 - Clearly indicate "Apply Today" jobs.
 - Quick status menu offering:
   - Interested

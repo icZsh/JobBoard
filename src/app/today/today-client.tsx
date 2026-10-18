@@ -111,7 +111,10 @@ function BadgeCluster({
   historicalReview: boolean;
 }) {
   const applyToday = isApplyTodayClient(job, highFitThreshold, historicalReview);
-  const highFit = isHighFitClient(job, highFitThreshold);
+  // Nearly every recommendation is High priority, so only the exceptions get a badge.
+  const priorityLabel = job.priority && job.priority !== "HIGH"
+    ? `${formatStatusLabel(job.priority)} priority`
+    : null;
 
   return (
     <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
@@ -124,10 +127,9 @@ function BadgeCluster({
       {applyToday ? (
         <span className="paper-badge badge-apply">Apply Today</span>
       ) : null}
-      {highFit ? <span className="paper-badge badge-fit">High Fit</span> : null}
-      {job.priority ? (
+      {priorityLabel ? (
         <span className={`paper-badge ${job.priorityClass}`}>
-          {formatStatusLabel(job.priority)}
+          {priorityLabel}
         </span>
       ) : null}
     </div>

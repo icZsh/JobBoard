@@ -616,7 +616,7 @@ Required visible fields:
 - Remote type, unless the location text already states it.
 - Salary range if available.
 - Fit score.
-- Priority.
+- Priority, only when it isn't `HIGH`, labelled like "Medium priority" or "Low priority".
 - Status, for tracked jobs only; untracked (`NEW`) jobs show no status chip.
 
 Suggested action is not shown on the card: it is effectively "Apply today." or "Review today.", which the Apply Today badge already conveys. It still feeds the Apply Today rule and remains on Job Detail.
