@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { formatStatusLabel } from "@/lib/format";
 import { getJobDetailHref } from "@/lib/jobs/links";
+import { patchJobTracking } from "@/lib/jobs/tracking-client";
 
 export const boardStatuses = [
   "NEW",
@@ -154,6 +155,7 @@ export function BoardClient({ jobs }: { jobs: BoardJobItem[] }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   const grouped = useMemo(
     () =>
@@ -180,6 +182,7 @@ export function BoardClient({ jobs }: { jobs: BoardJobItem[] }) {
       return;
     }
 
+    setMoveError(null);
     setItems((current) =>
       current.map((job) =>
         job.id === jobId
@@ -191,18 +194,15 @@ export function BoardClient({ jobs }: { jobs: BoardJobItem[] }) {
     window.setTimeout(() => setLandedId(null), 450);
 
     try {
-      const response = await fetch(`/api/jobs/${jobId}/tracking`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Move failed.");
-      }
-    } catch {
+      await patchJobTracking(jobId, { status });
+    } catch (error) {
       setItems((current) =>
         current.map((job) => (job.id === jobId ? previous : job)),
+      );
+      setMoveError(
+        `Couldn't move ${previous.company} to ${formatStatusLabel(status)}. ${
+          error instanceof Error ? error.message : "Unknown error."
+        }`,
       );
     }
   }
@@ -294,6 +294,23 @@ export function BoardClient({ jobs }: { jobs: BoardJobItem[] }) {
           );
         })}
       </section>
+
+      {moveError ? (
+        <div
+          className="fixed bottom-5 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-semibold text-white shadow-xl"
+          role="alert"
+        >
+          <AlertTriangle aria-hidden="true" className="h-4 w-4 flex-none text-[var(--pass-border)]" />
+          <span>{moveError}</span>
+          <button
+            className="font-bold text-[var(--pass-border)]"
+            onClick={() => setMoveError(null)}
+            type="button"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }
