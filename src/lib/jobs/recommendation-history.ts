@@ -1,7 +1,7 @@
 import { getStablePostingId } from "@/lib/import/posting-identity";
 export { getStablePostingId } from "@/lib/import/posting-identity";
 import { z } from "zod";
-import { normalizeSourceUrl, normalizeTextForDedupe } from "@/lib/import/dedupe";
+import { buildFallbackDedupeKey, normalizeSourceUrl } from "@/lib/import/dedupe";
 import { importPayloadSchema, parseDateOnly } from "@/lib/import/validation";
 import { selectRecommendations, type RecommendationCandidate } from "@/lib/jobs/recommendation-eligibility";
 
@@ -112,10 +112,8 @@ function identityOf(listing: ListingIdentity) {
   const stableId = getStablePostingId(listing.source_url);
   let url = normalizeSourceUrl(listing.source_url);
   if (url && !/^https?:\/\//u.test(url)) url = null;
-  const location = normalizeTextForDedupe(listing.location);
-  const fallback = location ? JSON.stringify([
-    normalizeTextForDedupe(listing.company), normalizeTextForDedupe(listing.title), location,
-  ]) : null;
+  // Match the importer even for legacy listings whose location is missing.
+  const fallback = buildFallbackDedupeKey(listing);
   return { stableId, url, key: stableId ?? url, fallback };
 }
 
@@ -127,7 +125,7 @@ export function findMatchingHistory<T extends ListingIdentity>(listing: ListingI
     if (identity.stableId && entry.identity.stableId) return identity.stableId === entry.identity.stableId;
     return identity.url !== null && identity.url === entry.identity.url;
   });
-  const fallback = identity.fallback ? indexed.filter((entry) => entry.identity.fallback === identity.fallback) : [];
+  const fallback = indexed.filter((entry) => entry.identity.fallback === identity.fallback);
   const fallbackKeys = new Set(fallback.map((entry) => entry.identity.key).filter((key) => key !== null));
   if (identity.key) fallbackKeys.add(identity.key);
   const ambiguous = !identity.key && fallbackKeys.size > 1;

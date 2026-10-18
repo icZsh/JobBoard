@@ -531,6 +531,10 @@ Status transitions are unrestricted: any status can move to any other status. Th
 
 The explicit Today Undo action restores both the previous status and the application date that existed before that quick action. Ordinary status changes continue to preserve an existing application date.
 
+Today permits only one tracking request per job at a time, including Undo. The affected status menu stays disabled until the request settles; other jobs remain independently editable. Success uses the server's saved status/application date, and failure restores both previous values.
+
+Tracking date inputs use Pacific calendar dates. New date-only inputs are stored at noon UTC so they round-trip without a day shift. Exact UTC-midnight timestamps retain the legacy date-only interpretation used by earlier versions; other timestamps display their Pacific calendar day. The existing schema does not distinguish historical calendar encodings from a genuine event at exactly UTC midnight, so that boundary follows the legacy convention without rewriting stored data.
+
 ### `/import`
 
 Supports JSON file import. Uses the same import service as `/api/import-jobs`.
@@ -767,6 +771,16 @@ Malformed JSON or requests missing the minimum envelope (`run_date` plus `jobs[]
 
 Pool identity uses the ATS provider and posting ID. First/last observation timestamps persist across runs, separately from provider publication data. Ashby `publishedAt` is last publication; Greenhouse `updated_at` is never used as original publication; Lever creation time, if provided, is labeled as such. Source content remains untrusted data. Only complete successful snapshots establish disappearance. Failed, disabled or removed sources cannot supply a fresh review candidate; their history is retained.
 
-Queue candidates and uncertainty holds are preliminary, not final eligibility or scored recommendations. The generator must evaluate current employer evidence, industry exclusions and the current resume, then use the existing recommendation-history filter and import schema. No discovery operation writes the application database or changes tracking. `--discover-only` on the existing importer refreshes history and discovery, then exits before any import; the ordinary handoff performs the same preparation before its existing missing/unchanged-file checks.
+Queue candidates and uncertainty holds are preliminary, not final eligibility or scored recommendations. The generator must evaluate current employer evidence, industry exclusions and the current resume, then use the existing recommendation-history filter and import schema. History screening uses the same normalized fallback key as import, including an empty location; different known posting identities stay separate and ambiguous URL-less matches are held. No discovery operation writes the application database or changes tracking. `--discover-only` on the existing importer refreshes history and discovery, then exits before any import; the ordinary handoff performs the same preparation before checking for a final payload and prior publication.
 
 Verification covers provider response shape, hidden postings, pagination/completeness, timeout/failure handling, incremental disappearance, first-seen persistence, geography/level uncertainty, applied aliases, stale history, cache refresh and current tracking changes.
+
+## Daily automation publication
+
+The versioned launchd entrypoint is `scripts/import-latest-job-list.zsh`; the installed copy under the daily automation directory delegates publication to `scripts/import-daily-shortlist.ts`. Dates use America/Los_Angeles. A macOS kernel file lock serializes handoffs and is released when its last process exits, including after a crash; the retained lock file itself does not block future runs. The general import API still supports deliberate reimports; the unattended daily publisher must not replace an already successful run for the same date, including empty runs or runs without a local hash marker.
+
+After discovery completes, the publisher fetches a fresh `/api/export`, checks server import runs, and filters against that current tracking. It saves the import-time history to `YYYY-MM-DD.import-history.json`, leaving `recommendation-history.json` paired with discovery's report/queue timestamps. This narrows the scan-time race without claiming an atomic transaction between external tracking edits and POST.
+
+Before sending one POST, exclusively create `YYYY-MM-DD.attempt.json` with the original file hash, canonical submitted payload hash and attempt timestamp, and sync the journal and parent directory. Save the exact filtered payload separately. Competing publishers cannot reserve a second attempt. Only a validated success receipt or a matching successful server run may produce the receipt and hash marker. Server reconciliation compares canonical JSON (object key order is irrelevant) and actual recommendation counts against the importer's deduplication rules; recovered receipts omit unavailable created/updated counts.
+
+Timeouts, connection loss, malformed receipts and other uncertain outcomes trigger read-only reconciliation, never a second POST. Keep an unresolved attempt across later invocations; an absent marker is not proof of failure. Any same-date pending run, conflicting success, unverified marker or unresolved attempt blocks automatic publication. `--mark-imported` only recovers a verified existing success and cannot manufacture one. `--dry-run` performs validation, live eligibility and publication checks without a POST or attempt reservation. Corrections or retries after a failed/uncertain attempt require operator review of the live export and preserved attempt/payload; do not delete state to bypass this guard.

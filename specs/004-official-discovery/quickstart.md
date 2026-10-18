@@ -11,6 +11,8 @@ State directory: `/Users/isaaczhu/.codex/automations/daily-data-job-shortlist/di
 - `candidates.md`: readable preview; `queue.json` contains the complete records.
 - `status.json`: running, complete or failed. Consumers check completion and matching timestamps; old files alone are not current evidence.
 
+Publication state remains in the sibling `import-state` directory. After the scan, the importer saves a separate dated `import-history.json` snapshot, a filtered payload and a durable `attempt.json` before POST. Success produces a verified `response.json` and source-file SHA marker. Recovered responses may omit created/updated counts that the export cannot establish. A pending/uncertain attempt or another successful run for the date blocks automatic resubmission, even if the final file changes. Inspect the server export and retained payload before any operator-authorized correction; never remove a marker or attempt merely to force a retry. The tracked entrypoint is `scripts/import-latest-job-list.zsh`; keep its installed automation copy in sync.
+
 Refresh history/discovery without importing a shortlist:
 
 ```sh

@@ -7,6 +7,7 @@ import {
 } from "../src/lib/import/dedupe";
 import { previewImportPayload } from "../src/lib/import/import-service";
 import { importPayloadSchema } from "../src/lib/import/validation";
+import { filterRecommendationPayload } from "../src/lib/jobs/recommendation-history";
 
 function makePreviewDb(existingJobIdsByDedupeKey = new Map<string, string>()) {
   return {
@@ -210,4 +211,45 @@ test("previews invalid rows, payload duplicates, and existing matches", async ()
   assert.equal(preview.rows[1].duplicateInPayload, true);
   assert.equal(preview.rows[2].existingJobId, "existing-job-id");
   assert.equal(preview.rows[3].errors.length > 0, true);
+});
+
+test("history filter suppresses the applied empty-location row that importer preview would reuse", async () => {
+  const now = new Date("2026-10-15T01:00:00.000Z");
+  for (const location of [null, "", " \t "]) {
+    const historicalJob = {
+      job_id: "applied-without-location", company: "Example", title: "Data Engineer",
+      location, source_url: null, status: "APPLIED", applied_at: null, recommended_run_dates: [],
+    };
+    const dedupe = buildDedupeInfo(historicalJob);
+    const existing = {
+      id: historicalJob.job_id, sourceUrl: null,
+      dedupeKey: dedupe.fallbackKey, fallbackDedupeKey: dedupe.fallbackKey,
+    };
+    const payload = {
+      run_date: "2026-10-15", jobs: [{
+        company: historicalJob.company, title: historicalJob.title, location: null,
+        source_url: "https://job-boards.greenhouse.io/example/jobs/123", fit_score: 96, priority: "high",
+      }],
+    };
+    const db = {
+      $transaction: async <T>(callback: (tx: unknown) => Promise<T>) => callback({
+        job: {
+          findUnique: async ({ where }: { where: { dedupeKey: string } }) =>
+            where.dedupeKey === existing.dedupeKey ? existing : null,
+          findMany: async ({ where }: { where: { fallbackDedupeKey?: string; sourceUrl?: { contains: string } } }) => {
+            if (where.sourceUrl) return [];
+            return where.fallbackDedupeKey === existing.fallbackDedupeKey ? [existing] : [];
+          },
+        },
+      }),
+    };
+    const preview = await previewImportPayload(payload, db as never);
+    assert.equal(preview.rows[0].existingJobId, historicalJob.job_id);
+    assert.equal(preview.newJobs, 0);
+    const filtered = filterRecommendationPayload(payload, {
+      schema_version: 1, generated_at: now.toISOString(), jobs: [historicalJob],
+    }, now);
+    assert.equal(filtered.eligibleCount, 0);
+    assert.equal(filtered.suppressions[0].reason, "already_applied_or_in_pipeline");
+  }
 });

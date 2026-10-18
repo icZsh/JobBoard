@@ -121,13 +121,38 @@ test("URL aliases aggregate applied tracking without merging different requisiti
   assert.equal(result.suppressions[0].reason, "already_applied_or_in_pipeline");
 });
 
-test("fallback needs company, title and location and refuses ambiguous identities", () => {
+test("fallback uses company, title and an empty location and refuses ambiguous identities", () => {
   const noUrl = { ...listing(), source_url: null };
   assert.equal(findMatchingHistory(noUrl, [historyJob()]).matches.length, 1);
-  assert.equal(findMatchingHistory({ ...noUrl, location: null }, [historyJob({ location: null })]).matches.length, 0);
+  assert.equal(findMatchingHistory({ ...noUrl, location: null }, [historyJob({ location: null })]).matches.length, 1);
   const ambiguous = findMatchingHistory(noUrl, [historyJob(), historyJob({ job_id: "job-b", source_url: "https://job-boards.greenhouse.io/example/jobs/456" })]);
   assert.equal(ambiguous.ambiguous, true);
   assert.equal(ambiguous.matches.length, 0);
+});
+
+test("missing and blank locations cannot bypass an applied fallback-only history row", () => {
+  for (const location of [null, "", " \t "]) {
+    for (const historicalLocation of [null, "", " \t "]) {
+      const result = filterRecommendationPayload({
+        run_date: "2026-10-15", jobs: [{ ...listing(), location }],
+      }, snapshot([historyJob({ location: historicalLocation, source_url: null, status: "APPLIED" })]), now);
+      assert.equal(result.eligibleCount, 0);
+      assert.equal(result.suppressions[0].reason, "already_applied_or_in_pipeline");
+    }
+  }
+});
+
+test("empty-location fallbacks preserve known requisitions and hold ambiguous unknown identities", () => {
+  const applied = historyJob({ location: null, status: "APPLIED" });
+  const differentPosting = { ...listing("https://job-boards.greenhouse.io/example/jobs/456"), location: "" };
+  const distinct = filterRecommendationPayload({ run_date: "2026-10-15", jobs: [differentPosting] }, snapshot([applied]), now);
+  assert.deepEqual(distinct.payload.jobs, [differentPosting]);
+
+  const ambiguous = filterRecommendationPayload({
+    run_date: "2026-10-15", jobs: [{ ...listing(), source_url: null, location: " \t " }],
+  }, snapshot([applied, historyJob({ job_id: "other", location: "", source_url: differentPosting.source_url })]), now);
+  assert.equal(ambiguous.eligibleCount, 0);
+  assert.equal(ambiguous.suppressions[0].reason, "ambiguous_history_identity");
 });
 
 test("filter dedupes payload aliases and preserves original field casing and extension fields", () => {

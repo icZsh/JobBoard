@@ -98,6 +98,7 @@ Expected capabilities:
   - Archived
 - Use Show hidden to review excluded jobs, without Apply Today badges.
 - Explain when nothing new qualifies and keep the Board accessible for existing applications.
+- While saving a status or Undo, disable that job's status menu until completion so rapid changes cannot overwrite one another. Other jobs stay editable.
 
 ### Board
 
@@ -339,3 +340,5 @@ The daily search first reads a persistent candidate pool from public employer AT
 The initial scan is a baseline. First discovery, first recommendation and publication signals are separate facts. Reposted timestamps do not create a new job. The scanner broadly screens role family, location and level, puts uncertain roles in a review queue, and excludes applied/in-progress/closed tracking. It never invents fit scores or automatically recommends its results. The generator reviews the official JD and resume fit, prioritizes eligible unseen roles and retains strong repeat backfill under the existing policy.
 
 Each scan reports coverage, failures, raw listings, relevant listings, newly discovered identities, history-new candidates, review holds and exclusions. Unselected candidates persist across days. Missing positions are marked unavailable only after a complete successful board fetch; failures are explicit and cannot masquerade as an empty market. Source scans use bounded concurrency and timeouts with a same-local-date cache. The daily task keeps its current schedule; no separate worker or server restart is needed.
+
+The unattended importer checks tracking again after discovery and publishes at most once per date automatically. A successful daily list is preserved even if its source file later changes. When a submission's result is uncertain, verify the saved server run or report the unresolved attempt instead of resubmitting and replacing Today. Deliberate corrections remain a user decision.

@@ -12,7 +12,7 @@ import {
 } from "@/lib/jobs/recommendation-eligibility";
 import { canTailorResumeForStatus } from "@/lib/jobs/resume-tailoring";
 import { getStatusHue } from "@/lib/jobs/status-hue";
-import { patchJobTracking } from "@/lib/jobs/tracking-client";
+import { createJobStatusUpdater } from "@/lib/jobs/status-updates";
 
 const defaultVisibleJobs = 12;
 
@@ -256,6 +256,7 @@ function TodayCard({
   highFitThreshold,
   historicalReview,
   isOpen,
+  statusSaving,
   onToggleOpen,
   onStatusChange,
   onResumeTailored,
@@ -264,6 +265,7 @@ function TodayCard({
   highFitThreshold: number;
   historicalReview: boolean;
   isOpen: boolean;
+  statusSaving: boolean;
   onToggleOpen: () => void;
   onStatusChange: (job: TodayJobItem, status: string) => void;
   onResumeTailored: (jobId: string, fields: TailoredResumeFields) => void;
@@ -542,6 +544,8 @@ function TodayCard({
         <label className="paper-compact-select">
           <select
             aria-label={`Status for ${job.title}`}
+            aria-busy={statusSaving}
+            disabled={statusSaving}
             onChange={(event) => onStatusChange(job, event.target.value)}
             value={job.status}
           >
@@ -603,6 +607,8 @@ export function TodayClient({
   historicalReview: boolean;
 }) {
   const [items, setItems] = useState(jobs);
+  const [saveStatus] = useState(() => createJobStatusUpdater());
+  const [pendingStatusIds, setPendingStatusIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<FilterMode>("all");
   const [sort, setSort] = useState<SortMode>("fit");
   const [query, setQuery] = useState("");
@@ -693,50 +699,43 @@ export function TodayClient({
   const hiddenJobCount = filteredJobs.length - visibleJobs.length;
 
   async function updateStatus(job: TodayJobItem, status: string, restoredAppliedAt?: string | null) {
-    const previousStatus = job.status;
-    const appliedAt = restoredAppliedAt !== undefined
-      ? restoredAppliedAt
-      : job.appliedAt ?? (status === "APPLIED" ? new Date().toISOString() : null);
-    setToast((current) => (current?.kind === "error" ? null : current));
-    setItems((current) =>
-      current.map((item) =>
-        item.jobId === job.jobId ? { ...item, status, appliedAt } : item,
-      ),
-    );
-
-    try {
-      const tracking = await patchJobTracking(job.jobId, {
-        status,
-        ...(restoredAppliedAt !== undefined ? { appliedAt: restoredAppliedAt } : {}),
-      });
-      setItems((current) => current.map((item) =>
-        item.jobId === job.jobId
-          ? { ...item, status: tracking.status, appliedAt: tracking.appliedAt }
-          : item,
-      ));
-
-      if (!historicalReview && !isRecommendationTrackingEligible(status, tracking.appliedAt) && !showHidden) {
-        setToast({
-          kind: "undo",
-          message: `${job.company} moved to ${formatStatusLabel(status)}.`,
-          job: { ...job, status, appliedAt: tracking.appliedAt },
-          previousStatus,
-          previousAppliedAt: job.appliedAt,
+    await saveStatus(job, status, {
+      onPendingChange(pending) {
+        setPendingStatusIds((current) => {
+          const next = new Set(current);
+          if (pending) next.add(job.jobId);
+          else next.delete(job.jobId);
+          return next;
         });
-      }
-    } catch (error) {
-      setItems((current) =>
-        current.map((item) =>
+        if (pending) {
+          setToast((current) => current?.kind === "error" || current?.job.jobId === job.jobId ? null : current);
+        }
+      },
+      onChange(tracking) {
+        setItems((current) => current.map((item) =>
           item.jobId === job.jobId
-            ? { ...item, status: previousStatus, appliedAt: job.appliedAt }
+            ? { ...item, status: tracking.status, appliedAt: tracking.appliedAt }
             : item,
-        ),
-      );
-      setToast({
-        kind: "error",
-        message: `Couldn't update ${job.company}. ${error instanceof Error ? error.message : "Unknown error."}`,
-      });
-    }
+        ));
+      },
+      onSaved(tracking) {
+        if (!historicalReview && !isRecommendationTrackingEligible(tracking.status, tracking.appliedAt) && !showHidden) {
+          setToast({
+            kind: "undo",
+            message: `${job.company} moved to ${formatStatusLabel(tracking.status)}.`,
+            job: { ...job, status: tracking.status, appliedAt: tracking.appliedAt },
+            previousStatus: job.status,
+            previousAppliedAt: job.appliedAt,
+          });
+        }
+      },
+      onError(error) {
+        setToast({
+          kind: "error",
+          message: `Couldn't update ${job.company}. ${error instanceof Error ? error.message : "Unknown error."}`,
+        });
+      },
+    }, restoredAppliedAt);
   }
 
   async function undoStatus() {
@@ -847,6 +846,7 @@ export function TodayClient({
               highFitThreshold={highFitThreshold}
               historicalReview={historicalReview}
               isOpen={openIds.has(job.jobId)}
+              statusSaving={pendingStatusIds.has(job.jobId)}
               job={job}
               key={job.recommendationId}
               onResumeTailored={updateResumeFields}
@@ -903,6 +903,7 @@ export function TodayClient({
           ) : (
             <button
               className="font-bold text-[var(--accent-border)]"
+              disabled={pendingStatusIds.has(toast.job.jobId)}
               onClick={undoStatus}
               type="button"
             >

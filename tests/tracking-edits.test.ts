@@ -27,6 +27,32 @@ test("shows evening applications on their Pacific calendar day", () => {
   assert.equal(formatDateInput(null), "");
 });
 
+test("tracking forms preserve historical date-only values stored at UTC midnight", () => {
+  const form = toTrackingFormState({
+    status: "APPLIED",
+    notes: null,
+    nextAction: null,
+    nextActionDate: "2026-10-20T00:00:00.000Z",
+    appliedAt: "2026-10-11T00:00:00.000Z",
+    resumePath: null,
+    resumeVersion: null,
+  });
+
+  assert.equal(form.nextActionDate, "2026-10-20");
+  assert.equal(form.appliedAt, "2026-10-11");
+
+  for (const value of ["2026-01-01", "2026-03-08", "2026-11-01", "2026-12-31"]) {
+    assert.equal(formatDateInput(new Date(`${value}T00:00:00.000Z`)), value);
+  }
+});
+
+test("only exact UTC midnight receives the historical date-only interpretation", () => {
+  assert.equal(formatDateInput(new Date("2026-10-20T00:00:00.001Z")), "2026-10-19");
+  assert.equal(formatDateInput(new Date("2026-10-20T00:00:01.000Z")), "2026-10-19");
+  assert.equal(formatDateInput(new Date("2026-10-20T00:01:00.000Z")), "2026-10-19");
+  assert.equal(formatDateInput(new Date("2026-10-20T01:00:00.000Z")), "2026-10-19");
+});
+
 test("date inputs round-trip through storage, including DST changes", () => {
   for (const value of ["2026-01-01", "2026-03-08", "2026-10-11", "2026-11-01", "2026-12-31"]) {
     assert.equal(formatDateInput(parseDateInput(value)), value);

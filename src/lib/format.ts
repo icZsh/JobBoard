@@ -110,8 +110,23 @@ export function parseDateInput(value: string | null | undefined) {
   return new Date(`${value}T12:00:00.000Z`);
 }
 
-// Uses the review time zone, not UTC: applications are often recorded in the
-// Pacific evening, after the UTC date has already rolled over.
+// Older date inputs were stored at exact UTC midnight without an encoding tag.
+// Preserve their calendar date; a genuine timestamp at that exact instant is
+// indistinguishable and receives the same legacy interpretation. All other
+// timestamps use Pacific dates, including evening applications after UTC rollover.
 export function formatDateInput(value: Date | null | undefined) {
-  return value ? getLocalDateKey(value) : "";
+  if (!value) {
+    return "";
+  }
+
+  if (
+    value.getUTCHours() === 0 &&
+    value.getUTCMinutes() === 0 &&
+    value.getUTCSeconds() === 0 &&
+    value.getUTCMilliseconds() === 0
+  ) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return getLocalDateKey(value);
 }
