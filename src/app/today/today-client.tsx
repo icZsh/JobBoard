@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronDown, Search } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { formatStatusLabel } from "@/lib/format";
 import { getJobDetailHref } from "@/lib/jobs/links";
 import { canTailorResumeForStatus } from "@/lib/jobs/resume-tailoring";
+import { patchJobTracking } from "@/lib/jobs/tracking-client";
 
 const defaultVisibleJobs = 12;
 
@@ -540,11 +541,16 @@ export function TodayClient({
   const [showHidden, setShowHidden] = useState(initialShowHidden);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [showAllJobs, setShowAllJobs] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    job: TodayJobItem;
-    previousStatus: string;
-  } | null>(null);
+  const [toast, setToast] = useState<
+    | {
+        kind: "undo";
+        message: string;
+        job: TodayJobItem;
+        previousStatus: string;
+      }
+    | { kind: "error"; message: string }
+    | null
+  >(null);
 
   const filteredJobs = useMemo(() => {
     const queryValue = query.trim().toLowerCase();
@@ -613,6 +619,7 @@ export function TodayClient({
 
   async function updateStatus(job: TodayJobItem, status: string) {
     const previousStatus = job.status;
+    setToast((current) => (current?.kind === "error" ? null : current));
     setItems((current) =>
       current.map((item) =>
         item.jobId === job.jobId ? { ...item, status } : item,
@@ -620,24 +627,17 @@ export function TodayClient({
     );
 
     try {
-      const response = await fetch(`/api/jobs/${job.jobId}/tracking`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Status update failed.");
-      }
+      await patchJobTracking(job.jobId, { status });
 
       if (hiddenStatuses.has(status) && !showHidden) {
         setToast({
+          kind: "undo",
           message: `${job.company} moved to ${formatStatusLabel(status)}.`,
           job,
           previousStatus,
         });
       }
-    } catch {
+    } catch (error) {
       setItems((current) =>
         current.map((item) =>
           item.jobId === job.jobId
@@ -645,11 +645,15 @@ export function TodayClient({
             : item,
         ),
       );
+      setToast({
+        kind: "error",
+        message: `Couldn't update ${job.company}. ${error instanceof Error ? error.message : "Unknown error."}`,
+      });
     }
   }
 
   async function undoStatus() {
-    if (!toast) {
+    if (toast?.kind !== "undo") {
       return;
     }
 
@@ -777,15 +781,31 @@ export function TodayClient({
       ) : null}
 
       {toast ? (
-        <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-semibold text-white shadow-xl">
+        <div
+          className="fixed bottom-5 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-[var(--ink)] px-4 py-3 text-sm font-semibold text-white shadow-xl"
+          role={toast.kind === "error" ? "alert" : "status"}
+        >
+          {toast.kind === "error" ? (
+            <AlertTriangle aria-hidden="true" className="h-4 w-4 flex-none text-[var(--pass-border)]" />
+          ) : null}
           <span>{toast.message}</span>
-          <button
-            className="font-bold text-[var(--accent-border)]"
-            onClick={undoStatus}
-            type="button"
-          >
-            Undo
-          </button>
+          {toast.kind === "error" ? (
+            <button
+              className="font-bold text-[var(--pass-border)]"
+              onClick={() => setToast(null)}
+              type="button"
+            >
+              Dismiss
+            </button>
+          ) : (
+            <button
+              className="font-bold text-[var(--accent-border)]"
+              onClick={undoStatus}
+              type="button"
+            >
+              Undo
+            </button>
+          )}
         </div>
       ) : null}
     </>

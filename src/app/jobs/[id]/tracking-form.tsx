@@ -1,19 +1,16 @@
 "use client";
 
 import { AlertTriangle, ArrowRight, CalendarCheck, Check, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
-import { formatStatusLabel } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
+import { formatStatusLabel, getLocalDateKey } from "@/lib/format";
 import { canTailorResumeForStatus } from "@/lib/jobs/resume-tailoring";
-
-type TrackingFormState = {
-  status: string;
-  notes: string;
-  nextAction: string;
-  nextActionDate: string;
-  appliedAt: string;
-  resumePath: string;
-  resumeVersion: string;
-};
+import {
+  buildTrackingPatch,
+  mergeSavedTracking,
+  patchJobTracking,
+  toTrackingFormState,
+  type TrackingFormState,
+} from "@/lib/jobs/tracking-client";
 
 type StatusOption = {
   value: string;
@@ -46,6 +43,51 @@ function isEqual(left: TrackingFormState, right: TrackingFormState) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function useUnsavedChangesWarning(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      // Older Chromium only prompts when returnValue is set.
+      event.returnValue = true;
+    }
+
+    // In-app links (e.g. Back to Board) navigate client-side without beforeunload.
+    function confirmLeavingLink(event: MouseEvent) {
+      const link =
+        event.target instanceof Element ? event.target.closest("a[href]") : null;
+
+      if (
+        !link ||
+        link.getAttribute("target") === "_blank" ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      if (!window.confirm("You have unsaved tracking changes. Leave without saving?")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    window.addEventListener("click", confirmLeavingLink, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeUnload);
+      window.removeEventListener("click", confirmLeavingLink, true);
+    };
+  }, [enabled]);
+}
+
 export function TrackingForm({
   jobId,
   sourceUrl,
@@ -61,6 +103,7 @@ export function TrackingForm({
   const [lastSaved, setLastSaved] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [tailorWarnings, setTailorWarnings] = useState<string[]>([]);
@@ -68,6 +111,8 @@ export function TrackingForm({
   const dirty = useMemo(() => !isEqual(form, lastSaved), [form, lastSaved]);
   const showAppliedQuick = !terminalAppliedStatuses.has(form.status);
   const canTailorResume = canTailorResumeForStatus(form.status);
+
+  useUnsavedChangesWarning(dirty);
 
   function update<K extends keyof TrackingFormState>(
     key: K,
@@ -77,38 +122,46 @@ export function TrackingForm({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function save() {
-    if (!dirty || saving) {
+  async function save(submitted: TrackingFormState) {
+    const patch = buildTrackingPatch(submitted, lastSaved);
+
+    if (Object.keys(patch).length === 0 || saving) {
       return;
     }
 
     setSaving(true);
+    setSaveError(null);
 
     try {
-      const response = await fetch(`/api/jobs/${jobId}/tracking`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          status: form.status,
-          notes: form.notes,
-          nextAction: form.nextAction,
-          nextActionDate: form.nextActionDate || null,
-          appliedAt: form.appliedAt || null,
-          resumePath: form.resumePath,
-          resumeVersion: form.resumeVersion,
-        }),
-      });
+      const savedState = toTrackingFormState(
+        await patchJobTracking(jobId, patch),
+      );
 
-      if (!response.ok) {
-        throw new Error("Save failed.");
-      }
-
-      setLastSaved(form);
+      setLastSaved(savedState);
+      setForm((current) => mergeSavedTracking(current, submitted, savedState));
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2600);
+    } catch (error) {
+      setSaveError(
+        `Couldn't save tracking. ${
+          error instanceof Error ? error.message : "Unknown error."
+        }`,
+      );
     } finally {
       setSaving(false);
     }
+  }
+
+  function markAppliedToday() {
+    const submitted = {
+      ...form,
+      status: "APPLIED",
+      appliedAt: form.appliedAt || getLocalDateKey(new Date()),
+    };
+
+    setSaved(false);
+    setForm(submitted);
+    void save(submitted);
   }
 
   async function tailorResume() {
@@ -175,16 +228,9 @@ export function TrackingForm({
 
         {showAppliedQuick ? (
           <button
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-ctl)] border border-dashed border-[var(--accent-border)] bg-[var(--accent-bg)] text-xs font-bold text-[var(--accent-ink)] hover:border-solid"
-            onClick={() => {
-              const today = new Date().toISOString().slice(0, 10);
-              setSaved(false);
-              setForm((current) => ({
-                ...current,
-                status: "APPLIED",
-                appliedAt: current.appliedAt || today,
-              }));
-            }}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-ctl)] border border-dashed border-[var(--accent-border)] bg-[var(--accent-bg)] text-xs font-bold text-[var(--accent-ink)] hover:border-solid disabled:cursor-not-allowed disabled:opacity-55"
+            disabled={saving}
+            onClick={markAppliedToday}
             type="button"
           >
             <CalendarCheck className="h-4 w-4" />
@@ -334,7 +380,7 @@ export function TrackingForm({
           <button
             className="paper-btn paper-btn-solid flex-1"
             disabled={!dirty || saving}
-            onClick={() => void save()}
+            onClick={() => void save(form)}
             type="button"
           >
             {dirty ? (saving ? "Saving" : "Save tracking") : "Saved"}
@@ -348,6 +394,16 @@ export function TrackingForm({
             Saved
           </span>
         </div>
+
+        {saveError ? (
+          <div
+            className="flex gap-2 rounded-[10px] border border-[var(--pass-border)] bg-[var(--pass-bg)] p-3 text-xs leading-5 text-[var(--pass-ink)]"
+            role="alert"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+            <span>{saveError}</span>
+          </div>
+        ) : null}
 
         {sourceUrl ? (
           <a

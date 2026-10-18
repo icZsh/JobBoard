@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ImportRunStatus, JobStatus } from "@/generated/prisma/client";
-import { formatDateOnly, formatSalary, formatTimestamp } from "@/lib/format";
+import { formatDateOnly, formatSalary, formatTimestamp, getLocalDateKey } from "@/lib/format";
 import { getCompanyWebsiteUrl } from "@/lib/jobs/company-website";
 import { parseJobDescriptionSections } from "@/lib/jobs/description";
 import { isApplyTodayJob } from "@/lib/jobs/prioritization";
@@ -28,7 +28,6 @@ type TodayPageProps = {
 
 const hiddenStatuses = new Set<string>([JobStatus.PASSED, JobStatus.ARCHIVED]);
 const RECENT_RUN_DAY_COUNT = 7;
-const REVIEW_TIME_ZONE = "America/Los_Angeles";
 
 function getSingleParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -83,20 +82,6 @@ function getUtcRecentRunBounds(latestRunDate: Date) {
 
 function getRunDateKey(value: Date) {
   return value.toISOString().slice(0, 10);
-}
-
-function getLocalDateKey(value: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: REVIEW_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(value);
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return `${year}-${month}-${day}`;
 }
 
 function getTodayTitle(selectedRun: { runDate: Date } | null) {
