@@ -61,9 +61,6 @@ export function priorityBadgeClass(priority: Priority | null | undefined) {
     return "badge-high";
   }
 
-  if (priority === "MEDIUM") {
-    return "badge-fit";
-  }
-
+  // Teal (badge-fit) means high fit, so lower priorities stay neutral.
   return "badge-neutral";
 }

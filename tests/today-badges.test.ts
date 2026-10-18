@@ -37,4 +37,7 @@ test("Today cards label other priorities and keep their priority colouring", () 
   assert.ok(markup.includes(`<span class="paper-badge ${medium.priorityClass}">Medium priority</span>`));
   assert.ok(markup.includes(`<span class="paper-badge ${low.priorityClass}">Low priority</span>`));
   assert.ok(markup.includes(`<span class="paper-badge ${urgent.priorityClass}">Urgent priority</span>`));
+  // Teal is reserved for fit, so Medium must not look like the old High Fit badge.
+  assert.equal(medium.priorityClass, "badge-neutral");
+  assert.ok(!markup.includes("badge-fit"));
 });
