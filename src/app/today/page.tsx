@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { ImportRunStatus, JobStatus } from "@/generated/prisma/client";
-import { formatDateOnly, formatSalary, formatTimestamp, getLocalDateKey } from "@/lib/format";
+import {
+  formatDateOnly,
+  formatPostedAge,
+  formatSalary,
+  formatTimestamp,
+  getLocalDateKey,
+  REVIEW_TIME_ZONE,
+} from "@/lib/format";
 import { getCompanyWebsiteUrl } from "@/lib/jobs/company-website";
 import { parseJobDescriptionSections } from "@/lib/jobs/description";
 import { isApplyTodayJob } from "@/lib/jobs/prioritization";
@@ -252,7 +259,8 @@ function toTodayItem(
     priority: recommendation.priority,
     priorityClass: priorityBadgeClass(recommendation.priority),
     suggestedAction: recommendation.suggestedAction,
-    datePosted: job.datePosted ? formatDateOnly(job.datePosted) : "Unknown",
+    datePosted: job.datePosted ? formatDateOnly(job.datePosted) : null,
+    postedAge: formatPostedAge(job.datePosted, REVIEW_TIME_ZONE),
     companyOverview: descriptionSections.company,
     benefitsOverview: descriptionSections.benefits,
     roleOverview: descriptionSections.role ?? descriptionSections.legacy,

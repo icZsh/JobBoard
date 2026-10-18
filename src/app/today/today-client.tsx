@@ -51,7 +51,8 @@ export type TodayJobItem = {
   priority: string | null;
   priorityClass: string;
   suggestedAction: string | null;
-  datePosted: string;
+  datePosted: string | null;
+  postedAge: string | null;
   companyOverview: string | null;
   benefitsOverview: string | null;
   roleOverview: string | null;
@@ -230,21 +231,25 @@ function ExplanationLine({
 
 function FitStat({ job }: { job: TodayJobItem }) {
   const score = job.fitScore ?? 0;
+  const label = job.fitScore === null
+    ? "No fit score"
+    : `Fit score ${job.fitScore}, ${job.fitTier}`;
 
   return (
-    <div className="flex items-center gap-3">
+    <div
+      aria-label={label}
+      className="flex flex-none flex-col items-center gap-1.5 md:min-w-20"
+      role="img"
+    >
       <div
         className="fit-ring"
         style={{ "--score": score } as CSSProperties}
       >
         <span>{job.fitScore ?? "-"}</span>
       </div>
-      <div>
-        <p className="paper-label">Fit Score</p>
-        <p className="mt-1 text-sm font-semibold text-[var(--ink)]">
-          {job.fitTier}
-        </p>
-      </div>
+      <p className="hidden whitespace-nowrap text-xs font-semibold text-[var(--ink-soft)] md:block">
+        {job.fitTier}
+      </p>
     </div>
   );
 }
@@ -329,8 +334,8 @@ function TodayCard({
         <span className="absolute bottom-5 left-0 top-5 w-[3px] rounded-full bg-[var(--accent)]" />
       ) : null}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[19px] font-bold leading-tight text-[var(--ink)]">
               <Link
@@ -351,6 +356,7 @@ function TodayCard({
                 {formatStatusLabel(job.status)}
               </span>
             ) : null}
+            <BadgeCluster highFitThreshold={highFitThreshold} historicalReview={historicalReview} job={job} />
           </div>
           <p className="mt-2 text-[14px] text-[var(--ink-soft)]">
             {job.companyWebsiteUrl ? (
@@ -378,14 +384,20 @@ function TodayCard({
               </span>
             ) : null}
           </p>
-          {job.salary ? (
+          {job.salary || job.postedAge ? (
             <p className="mt-2 font-mono text-[13px] text-[var(--ink-soft)]">
               {job.salary}
+              {job.salary && job.postedAge ? " · " : null}
+              {job.postedAge ? (
+                <span className="whitespace-nowrap" title={job.datePosted ?? undefined}>
+                  {job.postedAge}
+                </span>
+              ) : null}
             </p>
           ) : null}
         </div>
-        <BadgeCluster highFitThreshold={highFitThreshold} historicalReview={historicalReview} job={job} />
-      </div>
+        <FitStat job={job} />
+      </header>
 
       {whyText || concerns ? (
         <dl className="mt-4 grid grid-cols-1 gap-y-2.5 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] px-4 py-3 md:grid-cols-[max-content_minmax(0,1fr)] md:items-baseline md:gap-x-5 md:gap-y-1.5">
@@ -397,16 +409,6 @@ function TodayCard({
           ) : null}
         </dl>
       ) : null}
-
-      <div className="mt-5 flex flex-wrap items-center gap-x-12 gap-y-4 border-t border-[var(--hair)] pt-5">
-        <FitStat job={job} />
-        <div>
-          <p className="paper-label">Date Posted</p>
-          <p className="mt-2 text-sm font-semibold text-[var(--ink)]">
-            {job.datePosted}
-          </p>
-        </div>
-      </div>
 
       <div
         aria-hidden={!isOpen}

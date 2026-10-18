@@ -615,7 +615,8 @@ Required visible fields:
 - Location.
 - Remote type, unless the location text already states it.
 - Salary range if available.
-- Fit score.
+- Posting age after the salary as relative text ("Posted today", "Posted yesterday", "Posted 17 days ago"), counted in whole America/Los_Angeles calendar days, with the absolute date on hover; omitted when `date_posted` is unknown.
+- Fit score, as a ring in the card header with its tier label on wider screens.
 - Priority, only when it isn't `HIGH`, labelled like "Medium priority" or "Low priority".
 - Status, for tracked jobs only; untracked (`NEW`) jobs show no status chip.
 - Why line: the repeat reason on a repeat that has one (the visible Repeat reason required under `/today`), labelled "Why this is worth another look", or "Repeat context" on hidden and older-date rows; otherwise `match_reason`, labelled "Why it fits".

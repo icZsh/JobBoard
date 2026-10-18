@@ -7,6 +7,44 @@ export function formatDateOnly(value: Date) {
   }).format(value);
 }
 
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+// Whole calendar days from a date-only posting (UTC parts) to today in timeZone.
+export function formatPostedAge(
+  datePosted: Date | null | undefined,
+  timeZone: string,
+  now = new Date(),
+) {
+  if (!datePosted) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((item) => item.type === type)?.value);
+  const today = Date.UTC(part("year"), part("month") - 1, part("day"));
+  const posted = Date.UTC(
+    datePosted.getUTCFullYear(),
+    datePosted.getUTCMonth(),
+    datePosted.getUTCDate(),
+  );
+  const days = Math.round((today - posted) / millisecondsPerDay);
+
+  if (days <= 0) {
+    return "Posted today";
+  }
+
+  if (days === 1) {
+    return "Posted yesterday";
+  }
+
+  return `Posted ${days} days ago`;
+}
+
 export function formatTimestamp(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -46,7 +84,7 @@ export function formatStatusLabel(status: string) {
     .replace(/\b\w/gu, (letter) => letter.toUpperCase());
 }
 
-const REVIEW_TIME_ZONE = "America/Los_Angeles";
+export const REVIEW_TIME_ZONE = "America/Los_Angeles";
 
 export function getLocalDateKey(value: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
