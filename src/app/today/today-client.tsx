@@ -23,7 +23,7 @@ const quickActions = [
   { status: "ARCHIVED", label: "Archived" },
 ] as const;
 
-type FilterMode = "all" | "apply" | "high" | "tracking";
+type FilterMode = "all" | "apply" | "interested";
 type SortMode = "fit" | "salary" | "company";
 
 export type TodayJobItem = {
@@ -91,6 +91,23 @@ export function isApplyTodayClient(job: TodayJobItem, highFitThreshold: number, 
 
 function isHighFitClient(job: TodayJobItem, highFitThreshold: number) {
   return typeof job.fitScore === "number" && job.fitScore >= highFitThreshold;
+}
+
+export function matchesTodayFilter(
+  job: TodayJobItem,
+  filter: FilterMode,
+  highFitThreshold: number,
+  historicalReview = false,
+) {
+  if (filter === "apply") {
+    return isApplyTodayClient(job, highFitThreshold, historicalReview);
+  }
+
+  if (filter === "interested") {
+    return job.status === "INTERESTED";
+  }
+
+  return true;
 }
 
 // Imported locations often already say "remote" or "hybrid"; avoid repeating it.
@@ -603,21 +620,7 @@ export function TodayClient({
           .toLowerCase()
           .includes(queryValue);
       })
-      .filter((job) => {
-        if (filter === "apply") {
-          return isApplyTodayClient(job, highFitThreshold, historicalReview);
-        }
-
-        if (filter === "high") {
-          return isHighFitClient(job, highFitThreshold);
-        }
-
-        if (filter === "tracking") {
-          return job.status !== "NEW";
-        }
-
-        return true;
-      })
+      .filter((job) => matchesTodayFilter(job, filter, highFitThreshold, historicalReview))
       .sort((left, right) => {
         if (left.recommendationSuppressed !== right.recommendationSuppressed) {
           return left.recommendationSuppressed ? 1 : -1;
@@ -720,8 +723,7 @@ export function TodayClient({
           {[
             ["all", "All"],
             ["apply", "Apply Today"],
-            ["high", "High Fit"],
-            ["tracking", "Tracking"],
+            ["interested", "Interested"],
           ].filter(([value]) => !historicalReview || value !== "apply").map(([value, label]) => (
             <button
               data-on={filter === value}
@@ -734,33 +736,36 @@ export function TodayClient({
           ))}
         </div>
 
-        <label className="paper-field flex-[0_1_260px]">
-          <Search />
-          <input
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search roles"
-            value={query}
-          />
-        </label>
+        <div className="flex min-w-0 flex-[1_1_360px] items-center gap-3">
+          <label className="paper-field min-w-0 flex-1 sm:flex-[0_1_260px]">
+            <Search />
+            <input
+              className="min-w-0 flex-1"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search roles"
+              value={query}
+            />
+          </label>
 
-        <div className="flex flex-1" />
-
-        <span className="paper-label">Sort</span>
-        <div className="paper-seg">
-          {[
-            ["fit", "Fit score"],
-            ["salary", "Salary"],
-            ["company", "Company"],
-          ].map(([value, label]) => (
-            <button
-              data-on={sort === value}
-              key={value}
-              onClick={() => setSort(value as SortMode)}
-              type="button"
+          <label className="paper-compact-select ml-auto">
+            <span className="sr-only">Sort by</span>
+            <select
+              aria-label="Sort by"
+              onChange={(event) => setSort(event.target.value as SortMode)}
+              value={sort}
             >
-              {label}
-            </button>
-          ))}
+              {[
+                ["fit", "Sort: Fit score"],
+                ["salary", "Sort: Salary"],
+                ["company", "Sort: Company"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="paper-compact-select-caret" aria-hidden="true" />
+          </label>
         </div>
       </div>
 
