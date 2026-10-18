@@ -220,6 +220,7 @@ function TodayCard({
 }) {
   const applyToday = isApplyTodayClient(job, highFitThreshold, historicalReview);
   const canTailorResume = canTailorResumeForStatus(job.status);
+  const statusInMenu = quickActions.some((action) => action.status === job.status);
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [tailorWarnings, setTailorWarnings] = useState<string[]>([]);
@@ -477,34 +478,28 @@ function TodayCard({
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col gap-4 border-t border-[var(--hair)] pt-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="paper-row">
-          {quickActions.map((action) => {
-            const isCurrent = job.status === action.status;
-            const isHiddenAction =
-              action.status === "PASSED" || action.status === "ARCHIVED";
-
-            return (
-              <button
-                className={`paper-btn h-8 px-3 text-xs ${
-                  isCurrent
-                    ? isHiddenAction
-                      ? "badge-pass"
-                      : "bg-[var(--ink)] text-white"
-                    : ""
-                }`}
-                disabled={isCurrent}
-                key={action.status}
-                onClick={() => onStatusChange(job, action.status)}
-                type="button"
-              >
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--hair)] pt-5">
+        <label className="paper-compact-select">
+          <select
+            aria-label={`Status for ${job.title}`}
+            onChange={(event) => onStatusChange(job, event.target.value)}
+            value={job.status}
+          >
+            {!statusInMenu ? (
+              <option disabled value={job.status}>
+                {job.status === "NEW" ? "Set status" : formatStatusLabel(job.status)}
+              </option>
+            ) : null}
+            {quickActions.map((action) => (
+              <option key={action.status} value={action.status}>
                 {action.label}
-              </button>
-            );
-          })}
-        </div>
+              </option>
+            ))}
+          </select>
+          <ChevronDown aria-hidden="true" className="paper-compact-select-caret" />
+        </label>
 
-        <div className="paper-row">
+        <div className="paper-row ml-auto">
           <button
             className="paper-btn"
             onClick={onToggleOpen}

@@ -624,11 +624,7 @@ Suggested action is not shown on the card: it is effectively "Apply today." or "
 Required actions:
 
 - Open matching posting detail page from the title in a new tab.
-- Interested.
-- Applying.
-- Applied.
-- Passed.
-- Archived.
+- Status menu offering Interested, Applying, Applied, Passed, and Archived. It shows the current status; untracked (`NEW`) jobs read "Set status".
 - Open details.
 - Open source listing.
 

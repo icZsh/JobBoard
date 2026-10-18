@@ -90,7 +90,7 @@ Expected capabilities:
 - Open the matching posting detail page from a job title in a new tab so the daily review context stays available.
 - Highlight high-fit jobs.
 - Clearly indicate "Apply Today" jobs.
-- Quick status actions:
+- Quick status menu offering:
   - Interested
   - Applying
   - Applied
