@@ -107,3 +107,14 @@ test("Today cards no longer render per-status buttons", () => {
   }
   assert.ok(!cards.includes(">Archived</button>"));
 });
+
+test("status chip colour follows the job's current status", () => {
+  // The hue is derived from status, so a status changed in the menu recolours the dot.
+  const markup = renderToday([
+    todayItem(candidate("interested", { status: "INTERESTED" })),
+    todayItem(candidate("applied", { status: "APPLIED" })),
+  ], true);
+
+  assert.ok(markup.includes("--status-hue:var(--st-interested)"));
+  assert.ok(markup.includes("--status-hue:var(--st-applied)"));
+});

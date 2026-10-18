@@ -53,7 +53,6 @@ export function todayItem(job: RecommendationCandidate): TodayJobItem {
     isRepeat: job.previousRunDates.length > 0,
     recommendationSuppressed: false,
     blockedByRelatedTracking: false,
-    statusHue: "100",
     fitTier: "High fit",
     priorityClass: "badge-neutral",
     suggestedAction: "Apply today",

@@ -17,7 +17,6 @@ import {
   getFitTier,
   getSalarySortValue,
   priorityBadgeClass,
-  statusHueByStatus,
 } from "@/lib/jobs/view";
 import { prisma } from "@/lib/prisma";
 import { getHighFitThreshold } from "@/lib/settings";
@@ -253,7 +252,6 @@ function toTodayItem(
     repeatEvidenceUrl,
     isRepeat: previousRunDates.length > 0,
     recommendationSuppressed: false,
-    statusHue: statusHueByStatus[status],
     fitScore: recommendation.fitScore,
     fitTier: getFitTier(recommendation.fitScore),
     priority: recommendation.priority,

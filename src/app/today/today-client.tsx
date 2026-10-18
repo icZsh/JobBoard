@@ -11,6 +11,7 @@ import {
   selectRecommendations,
 } from "@/lib/jobs/recommendation-eligibility";
 import { canTailorResumeForStatus } from "@/lib/jobs/resume-tailoring";
+import { getStatusHue } from "@/lib/jobs/status-hue";
 import { patchJobTracking } from "@/lib/jobs/tracking-client";
 
 const defaultVisibleJobs = 12;
@@ -45,7 +46,6 @@ export type TodayJobItem = {
   isRepeat: boolean;
   recommendationSuppressed: boolean;
   blockedByRelatedTracking: boolean;
-  statusHue: string;
   fitScore: number | null;
   fitTier: string;
   priority: string | null;
@@ -348,7 +348,7 @@ function TodayCard({
               <span className="paper-badge badge-neutral">
                 <span
                   className="status-dot"
-                  style={{ "--status-hue": job.statusHue } as CSSProperties}
+                  style={{ "--status-hue": getStatusHue(job.status) } as CSSProperties}
                 />
                 {formatStatusLabel(job.status)}
               </span>

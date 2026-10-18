@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronDown } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { formatStatusLabel } from "@/lib/format";
 import { getJobDetailHref } from "@/lib/jobs/links";
+import { getStatusHue } from "@/lib/jobs/status-hue";
 import { patchJobTracking } from "@/lib/jobs/tracking-client";
 
 export const boardStatuses = [
@@ -33,22 +34,6 @@ export type BoardJobItem = {
   priorityClass: string;
   lastSeen: string;
 };
-
-function getStatusHue(status: string) {
-  const hues: Record<string, string> = {
-    NEW: "var(--st-new)",
-    INTERESTED: "var(--st-interested)",
-    APPLYING: "var(--st-applying)",
-    APPLIED: "var(--st-applied)",
-    INTERVIEWING: "var(--st-interviewing)",
-    OFFER: "var(--st-offer)",
-    REJECTED: "var(--st-rejected)",
-    PASSED: "var(--st-passed)",
-    ARCHIVED: "var(--st-archived)",
-  };
-
-  return hues[status] ?? "var(--ink-faint)";
-}
 
 function BoardCard({
   job,
