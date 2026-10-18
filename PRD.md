@@ -40,7 +40,7 @@ Isaac, using the app locally on his own machine.
 - Deduplicate jobs across import runs.
 - Preserve personal tracking state across repeated imports.
 - Show the latest import run in a Today view.
-- Exclude Passed and Archived jobs from Today by default, with a toggle to include them.
+- Exclude already applied, in-progress, closed, and weak repeated recommendations from Today by default, with an explicit hidden-history review toggle.
 - Provide a status-based job board.
 - Provide a job detail view.
 - Allow editing personal tracking fields.
@@ -73,7 +73,15 @@ V1 is local-only and unauthenticated. The app should be served on localhost, sho
 
 The Today view is the daily review surface.
 
-It should show jobs from the latest import run, excluding jobs with `Passed` or `Archived` status by default.
+It should show eligible jobs from the latest import run, putting new recommendations first. Any saved application date, or Applying, Applied, Interviewing, Offer, Rejected, Passed, or Archived status, excludes a job from recommendations. These jobs remain available on the Board and in history.
+
+Recognized URL variants of the same posting share application and recommendation history, so an alternate application link cannot bring an already applied role back into Today.
+
+A job recommended on any earlier successful run date is a repeat. Reimports on the same calendar date do not create a repeat. Aim for about ten useful recommendations each day: exhaust fresh discovery first, rank new eligible jobs by fit, then fill remaining places with strong repeats. A repeat needs fit of at least 90, High priority, a specific reason, and an HTTPS evidence link. A currently verified, exceptionally close match in role, level, and technical stack qualifies even if the posting has not changed. Show the reason and label it as a repeat.
+
+Select up to ten recommendations from the candidate pool. Rank repeats by fit, preferring the longest time since the latest earlier recommendation when fit scores tie. Seven days is a recency preference, never a mandatory cooldown. There is no repeat quota that forces an empty or short list; already applied, in-progress, or closed jobs remain excluded even when fewer than ten eligible candidates exist.
+
+Dates before the latest successful run show plain dated job lists. Show every original recommendation from that selected run with its current tracking status, including applied and repeated jobs. Use the selected date without a history banner, History badges, or Historical review labels. Omit Apply Today badges and counts and use View source links. This keeps the recent seven days useful without inventing discoveries or changing saved history.
 
 Expected capabilities:
 
@@ -88,7 +96,8 @@ Expected capabilities:
   - Applied
   - Passed
   - Archived
-- Toggle visibility for Passed and Archived jobs.
+- Use Show hidden to review excluded jobs, without Apply Today badges.
+- Explain when nothing new qualifies and keep the Board accessible for existing applications.
 
 ### Board
 
@@ -203,17 +212,17 @@ A job is considered high fit when `fit_score >= 80` by default.
 
 ### Apply Today
 
-A job is shown as "Apply Today" when any of:
+A job is shown as "Apply Today" only when it is eligible for recommendations, has no saved application date, and any of:
 
 - `suggested_action` matches `/\bapply\s*today\b/i`.
-- `suggested_action` matches `/\bapply\b/i` and status is not Applied, Rejected, Passed, or Archived.
-- High fit (`fit_score >= high_fit_threshold`) and `concerns` is blank and status is not Applied, Rejected, Passed, or Archived.
+- `suggested_action` matches `/\bapply\b/i`.
+- High fit (`fit_score >= high_fit_threshold`) and `concerns` is blank.
 
 ## Deduplication Rules
 
 ### Primary Deduplication
 
-Use normalized `source_url`.
+Use normalized `source_url`, recognizing stable Greenhouse and Ashby requisition IDs across application-link variants.
 
 ### Fallback Deduplication
 
@@ -223,7 +232,7 @@ Use normalized:
 - Title.
 - Location.
 
-Fallback deduplication should run when a job has no source URL and when a URL-based lookup misses. This lets the app connect a later URL-bearing import to an earlier no-URL import of the same job.
+Fallback deduplication should run when a job has no source URL and when URL/ATS-ID lookups miss. A fallback match requires at least one side to lack a URL; two known, different posting identities must remain separate. This lets the app connect a later URL-bearing import to an earlier no-URL import of the same job.
 
 The fallback key should be stored separately from the primary unique dedupe key. The primary `dedupe_key` can be promoted from fallback-based to URL-based when a URL appears later, but the separate fallback key should remain available for future fallback matching.
 

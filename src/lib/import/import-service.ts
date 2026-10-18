@@ -1,5 +1,6 @@
 import { ImportRunStatus, type Job, Prisma, Priority } from "@/generated/prisma/client";
 import { prisma as defaultPrisma } from "@/lib/prisma";
+import { getStablePostingId } from "./posting-identity";
 import {
   buildDedupeInfo,
   dedupeIncomingJobs,
@@ -181,6 +182,17 @@ async function findExistingJob(
     }
   }
 
+  const postingId = getStablePostingId(dedupe.normalizedSourceUrl);
+  if (postingId) {
+    const id = postingId.slice(postingId.indexOf(":") + 1);
+    const possibleAliases = await tx.job.findMany({
+      where: { sourceUrl: { contains: id, mode: "insensitive" } },
+      orderBy: { createdAt: "asc" },
+    });
+    const alias = possibleAliases.find((job) => getStablePostingId(job.sourceUrl) === postingId);
+    if (alias) return alias;
+  }
+
   if (!options.allowFallbackMatch) {
     return null;
   }
@@ -192,7 +204,11 @@ async function findExistingJob(
   });
 
   if (fallbackMatches.length === 1) {
-    return fallbackMatches[0];
+    const match = fallbackMatches[0];
+    // Known, different URLs are distinct openings unless their stable ATS IDs
+    // matched above. Title/location alone must not transfer an application.
+    if (dedupe.normalizedSourceUrl && match.sourceUrl) return null;
+    return match;
   }
 
   return null;

@@ -5,6 +5,11 @@ import { AlertTriangle, ArrowRight, ChevronDown, Search } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { formatStatusLabel } from "@/lib/format";
 import { getJobDetailHref } from "@/lib/jobs/links";
+import { isApplyTodayJob } from "@/lib/jobs/prioritization";
+import {
+  isRecommendationTrackingEligible,
+  selectRecommendations,
+} from "@/lib/jobs/recommendation-eligibility";
 import { canTailorResumeForStatus } from "@/lib/jobs/resume-tailoring";
 import { patchJobTracking } from "@/lib/jobs/tracking-client";
 
@@ -17,14 +22,6 @@ const quickActions = [
   { status: "PASSED", label: "Passed" },
   { status: "ARCHIVED", label: "Archived" },
 ] as const;
-
-const hiddenStatuses = new Set(["PASSED", "ARCHIVED"]);
-const terminalApplyStatuses = new Set([
-  "APPLIED",
-  "REJECTED",
-  "PASSED",
-  "ARCHIVED",
-]);
 
 type FilterMode = "all" | "apply" | "high" | "tracking";
 type SortMode = "fit" | "salary" | "company";
@@ -41,6 +38,13 @@ export type TodayJobItem = {
   salarySort: number;
   sourceUrl: string | null;
   status: string;
+  appliedAt: string | null;
+  previousRunDates: string[];
+  repeatReason: string | null;
+  repeatEvidenceUrl: string | null;
+  isRepeat: boolean;
+  recommendationSuppressed: boolean;
+  blockedByRelatedTracking: boolean;
   statusHue: string;
   fitScore: number | null;
   fitTier: string;
@@ -77,23 +81,11 @@ type TailorResumeFailure = {
 
 type TailorResumeResponse = TailorResumeSuccess | TailorResumeFailure;
 
-export function isApplyTodayClient(job: TodayJobItem, highFitThreshold: number) {
-  const suggestedAction = job.suggestedAction ?? "";
-  const canStillApply = !terminalApplyStatuses.has(job.status);
-
-  if (/\bapply\s*today\b/iu.test(suggestedAction) && canStillApply) {
-    return true;
-  }
-
-  if (/\bapply\b/iu.test(suggestedAction) && canStillApply) {
-    return true;
-  }
-
+export function isApplyTodayClient(job: TodayJobItem, highFitThreshold: number, historicalReview = false) {
   return (
-    typeof job.fitScore === "number" &&
-    job.fitScore >= highFitThreshold &&
-    !job.concerns?.trim() &&
-    canStillApply
+    !historicalReview &&
+    !job.recommendationSuppressed &&
+    isApplyTodayJob({ ...job, highFitThreshold })
   );
 }
 
@@ -104,15 +96,23 @@ function isHighFitClient(job: TodayJobItem, highFitThreshold: number) {
 function BadgeCluster({
   job,
   highFitThreshold,
+  historicalReview,
 }: {
   job: TodayJobItem;
   highFitThreshold: number;
+  historicalReview: boolean;
 }) {
-  const applyToday = isApplyTodayClient(job, highFitThreshold);
+  const applyToday = isApplyTodayClient(job, highFitThreshold, historicalReview);
   const highFit = isHighFitClient(job, highFitThreshold);
 
   return (
     <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+      {!historicalReview && job.recommendationSuppressed ? (
+        <span className="paper-badge badge-neutral">Hidden · history review</span>
+      ) : null}
+      {job.isRepeat ? (
+        <span className="paper-badge badge-neutral">Repeat</span>
+      ) : null}
       {applyToday ? (
         <span className="paper-badge badge-apply">Apply Today</span>
       ) : null}
@@ -196,6 +196,7 @@ function FitStat({ job }: { job: TodayJobItem }) {
 function TodayCard({
   job,
   highFitThreshold,
+  historicalReview,
   isOpen,
   onToggleOpen,
   onStatusChange,
@@ -203,12 +204,13 @@ function TodayCard({
 }: {
   job: TodayJobItem;
   highFitThreshold: number;
+  historicalReview: boolean;
   isOpen: boolean;
   onToggleOpen: () => void;
   onStatusChange: (job: TodayJobItem, status: string) => void;
   onResumeTailored: (jobId: string, fields: TailoredResumeFields) => void;
 }) {
-  const applyToday = isApplyTodayClient(job, highFitThreshold);
+  const applyToday = isApplyTodayClient(job, highFitThreshold, historicalReview);
   const canTailorResume = canTailorResumeForStatus(job.status);
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
@@ -318,8 +320,20 @@ function TodayCard({
             </p>
           ) : null}
         </div>
-        <BadgeCluster highFitThreshold={highFitThreshold} job={job} />
+        <BadgeCluster highFitThreshold={highFitThreshold} historicalReview={historicalReview} job={job} />
       </div>
+
+      {job.isRepeat && job.repeatReason ? (
+        <div className="mt-4 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] p-4">
+          <p className="paper-label">{historicalReview || job.recommendationSuppressed ? "Repeat context" : "Why this is worth another look"}</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">{job.repeatReason}</p>
+          {job.repeatEvidenceUrl ? (
+            <a className="paper-link mt-2 inline-block text-sm" href={job.repeatEvidenceUrl} rel="noopener noreferrer" target="_blank">
+              View supporting evidence
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 border-t border-[var(--hair)] pt-5 md:grid-cols-[auto_1fr_1fr]">
         <FitStat job={job} />
@@ -515,7 +529,7 @@ function TodayCard({
               rel="noreferrer"
               target="_blank"
             >
-              Apply
+              {historicalReview || job.recommendationSuppressed ? "View source" : "Apply"}
               <ArrowRight className="h-4 w-4" />
             </a>
           ) : null}
@@ -529,10 +543,14 @@ export function TodayClient({
   jobs,
   highFitThreshold,
   initialShowHidden,
+  runDate,
+  historicalReview,
 }: {
   jobs: TodayJobItem[];
   highFitThreshold: number;
   initialShowHidden: boolean;
+  runDate: string;
+  historicalReview: boolean;
 }) {
   const [items, setItems] = useState(jobs);
   const [filter, setFilter] = useState<FilterMode>("all");
@@ -547,16 +565,31 @@ export function TodayClient({
         message: string;
         job: TodayJobItem;
         previousStatus: string;
+        previousAppliedAt: string | null;
       }
     | { kind: "error"; message: string }
     | null
   >(null);
 
+  const recommendationItems = useMemo(() => {
+    if (historicalReview) {
+      return items.map((job) => ({ ...job, recommendationSuppressed: false }));
+    }
+    const selection = selectRecommendations(items.filter((job) => !job.blockedByRelatedTracking), new Date(runDate));
+    return [
+      ...selection.eligible.map((job) => ({ ...job, recommendationSuppressed: false })),
+      ...selection.suppressed.map((job) => ({ ...job, recommendationSuppressed: true })),
+      ...items.filter((job) => job.blockedByRelatedTracking).map((job) => ({ ...job, recommendationSuppressed: true })),
+    ];
+  }, [historicalReview, items, runDate]);
+  const suppressedCount = recommendationItems.filter((job) => job.recommendationSuppressed).length;
+  const hasEligibleRecommendations = recommendationItems.some((job) => !job.recommendationSuppressed);
+
   const filteredJobs = useMemo(() => {
     const queryValue = query.trim().toLowerCase();
 
-    return items
-      .filter((job) => showHidden || !hiddenStatuses.has(job.status))
+    return recommendationItems
+      .filter((job) => showHidden || !job.recommendationSuppressed)
       .filter((job) => {
         if (!queryValue) {
           return true;
@@ -580,7 +613,7 @@ export function TodayClient({
       })
       .filter((job) => {
         if (filter === "apply") {
-          return isApplyTodayClient(job, highFitThreshold);
+          return isApplyTodayClient(job, highFitThreshold, historicalReview);
         }
 
         if (filter === "high") {
@@ -594,6 +627,12 @@ export function TodayClient({
         return true;
       })
       .sort((left, right) => {
+        if (left.recommendationSuppressed !== right.recommendationSuppressed) {
+          return left.recommendationSuppressed ? 1 : -1;
+        }
+        if (!historicalReview && left.isRepeat !== right.isRepeat) {
+          return left.isRepeat ? 1 : -1;
+        }
         if (sort === "company") {
           return left.company.localeCompare(right.company);
         }
@@ -602,8 +641,8 @@ export function TodayClient({
           return right.salarySort - left.salarySort;
         }
 
-        const leftApply = isApplyTodayClient(left, highFitThreshold);
-        const rightApply = isApplyTodayClient(right, highFitThreshold);
+        const leftApply = isApplyTodayClient(left, highFitThreshold, historicalReview);
+        const rightApply = isApplyTodayClient(right, highFitThreshold, historicalReview);
 
         if (leftApply !== rightApply) {
           return leftApply ? -1 : 1;
@@ -611,37 +650,49 @@ export function TodayClient({
 
         return (right.fitScore ?? -1) - (left.fitScore ?? -1);
       });
-  }, [filter, highFitThreshold, items, query, showHidden, sort]);
+  }, [filter, highFitThreshold, historicalReview, recommendationItems, query, showHidden, sort]);
   const visibleJobs = showAllJobs
     ? filteredJobs
     : filteredJobs.slice(0, defaultVisibleJobs);
   const hiddenJobCount = filteredJobs.length - visibleJobs.length;
 
-  async function updateStatus(job: TodayJobItem, status: string) {
+  async function updateStatus(job: TodayJobItem, status: string, restoredAppliedAt?: string | null) {
     const previousStatus = job.status;
+    const appliedAt = restoredAppliedAt !== undefined
+      ? restoredAppliedAt
+      : job.appliedAt ?? (status === "APPLIED" ? new Date().toISOString() : null);
     setToast((current) => (current?.kind === "error" ? null : current));
     setItems((current) =>
       current.map((item) =>
-        item.jobId === job.jobId ? { ...item, status } : item,
+        item.jobId === job.jobId ? { ...item, status, appliedAt } : item,
       ),
     );
 
     try {
-      await patchJobTracking(job.jobId, { status });
+      const tracking = await patchJobTracking(job.jobId, {
+        status,
+        ...(restoredAppliedAt !== undefined ? { appliedAt: restoredAppliedAt } : {}),
+      });
+      setItems((current) => current.map((item) =>
+        item.jobId === job.jobId
+          ? { ...item, status: tracking.status, appliedAt: tracking.appliedAt }
+          : item,
+      ));
 
-      if (hiddenStatuses.has(status) && !showHidden) {
+      if (!historicalReview && !isRecommendationTrackingEligible(status, tracking.appliedAt) && !showHidden) {
         setToast({
           kind: "undo",
           message: `${job.company} moved to ${formatStatusLabel(status)}.`,
-          job,
+          job: { ...job, status, appliedAt: tracking.appliedAt },
           previousStatus,
+          previousAppliedAt: job.appliedAt,
         });
       }
     } catch (error) {
       setItems((current) =>
         current.map((item) =>
           item.jobId === job.jobId
-            ? { ...item, status: previousStatus }
+            ? { ...item, status: previousStatus, appliedAt: job.appliedAt }
             : item,
         ),
       );
@@ -657,9 +708,9 @@ export function TodayClient({
       return;
     }
 
-    const { job, previousStatus } = toast;
+    const { job, previousStatus, previousAppliedAt } = toast;
     setToast(null);
-    await updateStatus(job, previousStatus);
+    await updateStatus(job, previousStatus, previousAppliedAt);
   }
 
   function updateResumeFields(jobId: string, fields: TailoredResumeFields) {
@@ -679,7 +730,7 @@ export function TodayClient({
             ["apply", "Apply Today"],
             ["high", "High Fit"],
             ["tracking", "Tracking"],
-          ].map(([value, label]) => (
+          ].filter(([value]) => !historicalReview || value !== "apply").map(([value, label]) => (
             <button
               data-on={filter === value}
               key={value}
@@ -721,28 +772,42 @@ export function TodayClient({
         </div>
       </div>
 
-      <div className="mb-5">
+      {!historicalReview ? <div className="mb-5">
         <button
           className="paper-btn paper-btn-ghost"
+          aria-pressed={showHidden}
           onClick={() => setShowHidden((value) => !value)}
           type="button"
         >
-          {showHidden ? "Hide Passed/Archived" : "Show Passed/Archived"}
+          {showHidden ? "Hide excluded recommendations" : `Show hidden (${suppressedCount})`}
         </button>
-      </div>
+        {showHidden ? (
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            History review includes applications, closed jobs, and repeats that did not qualify for today&apos;s recommendations.
+          </p>
+        ) : null}
+      </div> : null}
 
       {filteredJobs.length === 0 ? (
         <div className="paper-card paper-empty">
-          <h2 className="text-lg font-bold text-[var(--ink)]">No roles match</h2>
+          <h2 className="text-lg font-bold text-[var(--ink)]">
+            {!showHidden && !hasEligibleRecommendations ? "No new recommendations qualify" : "No roles match"}
+          </h2>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Adjust the filter, search, or hidden-status toggle.
+            {!showHidden && !hasEligibleRecommendations
+              ? "Your existing applications and saved jobs are still on the Board. Repeated roles can return when their strong fit is supported by current evidence."
+              : "Adjust the filter, search, or Show hidden toggle."}
           </p>
+          {!showHidden && !hasEligibleRecommendations ? (
+            <Link className="paper-btn mt-4" href="/board">Open Board</Link>
+          ) : null}
         </div>
       ) : (
         <section className="flex flex-col gap-[18px]">
           {visibleJobs.map((job) => (
             <TodayCard
               highFitThreshold={highFitThreshold}
+              historicalReview={historicalReview}
               isOpen={openIds.has(job.jobId)}
               job={job}
               key={job.recommendationId}

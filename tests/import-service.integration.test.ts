@@ -139,3 +139,83 @@ test("invalid payloads with a minimum envelope preserve a failed raw payload", a
 
   assert.equal(jobCount, 0);
 });
+
+test("empty filtered shortlists succeed and preserve applied tracking", async () => {
+  await importJobsPayload(makePayload(`${TEST_SOURCE_PREFIX}_empty_setup`));
+  const job = await prisma.job.findFirstOrThrow({ where: { company: TEST_COMPANY } });
+  await updateJobTracking(job.id, {
+    status: JobStatus.APPLIED,
+    notes: "Application remains tracked when there are no new recommendations.",
+  });
+  const before = await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: job.id } });
+
+  const result = await importJobsPayload({
+    run_date: "2026-05-31",
+    source_name: `${TEST_SOURCE_PREFIX}_empty`,
+    jobs: [],
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.importedJobs, 0);
+  assert.equal(result.recommendationsCreated, 0);
+  assert.deepEqual(
+    await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: job.id } }),
+    before,
+  );
+});
+
+test("repeat evidence survives import in raw recommendation context", async () => {
+  const base = makePayload(`${TEST_SOURCE_PREFIX}_repeat_evidence`);
+  const repeat = {
+    ...base.jobs[0],
+    repeat_reason: "Employer now confirms remote eligibility.",
+    repeat_evidence_url: "https://example.com/item8/backend",
+  };
+  const result = await importJobsPayload({ ...base, jobs: [repeat] });
+  assert.equal(result.ok, true);
+  const recommendation = await prisma.jobRecommendation.findFirstOrThrow({
+    where: { importRunId: result.importRunId },
+  });
+  const raw = recommendation.rawRecommendation as Record<string, unknown>;
+  assert.equal(raw.repeat_reason, repeat.repeat_reason);
+  assert.equal(raw.repeat_evidence_url, repeat.repeat_evidence_url);
+});
+
+test("distinct ATS requisitions do not inherit an older job's application", async () => {
+  const base = makePayload(`${TEST_SOURCE_PREFIX}_identity_first`);
+  base.jobs[0].source_url = "https://job-boards.greenhouse.io/item8-test/jobs/999999001";
+  await importJobsPayload(base);
+  const first = await prisma.job.findFirstOrThrow({ where: { company: TEST_COMPANY } });
+  await updateJobTracking(first.id, { status: JobStatus.APPLIED });
+  const before = await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: first.id } });
+  const second = await importJobsPayload({
+    ...base,
+    source_name: `${TEST_SOURCE_PREFIX}_identity_second`,
+    jobs: [{ ...base.jobs[0], source_url: "https://job-boards.greenhouse.io/item8-test/jobs/999999002" }],
+  });
+  assert.equal(second.ok, true);
+  assert.equal(second.createdJobs, 1);
+  const jobs = await prisma.job.findMany({ where: { company: TEST_COMPANY }, include: { tracking: true } });
+  assert.equal(jobs.length, 2);
+  assert.equal(jobs.find((job) => job.id !== first.id)?.tracking?.status, JobStatus.NEW);
+  assert.deepEqual(await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: first.id } }), before);
+
+  const alias = await importJobsPayload({
+    ...base,
+    source_name: `${TEST_SOURCE_PREFIX}_identity_alias`,
+    jobs: [{ ...base.jobs[0], location: "Remote (US)", source_url: "https://careers.example.com/data-role?gh_jid=999999001" }],
+  });
+  assert.equal(alias.ok, true);
+  assert.equal(alias.createdJobs, 0);
+  assert.deepEqual(await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: first.id } }), before);
+});
+
+test("explicit undo can restore a newly recorded application date", async () => {
+  await importJobsPayload(makePayload(`${TEST_SOURCE_PREFIX}_undo`));
+  const job = await prisma.job.findFirstOrThrow({ where: { company: TEST_COMPANY } });
+  await updateJobTracking(job.id, { status: JobStatus.APPLIED });
+  assert.ok((await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: job.id } })).appliedAt);
+  await updateJobTracking(job.id, { status: JobStatus.INTERESTED });
+  assert.ok((await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: job.id } })).appliedAt);
+  await updateJobTracking(job.id, { status: JobStatus.NEW, appliedAt: null });
+  assert.equal((await prisma.jobTracking.findUniqueOrThrow({ where: { jobId: job.id } })).appliedAt, null);
+});

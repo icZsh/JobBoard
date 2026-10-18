@@ -1,11 +1,4 @@
-import { JobStatus } from "@/generated/prisma/client";
-
-const terminalApplyStatuses = new Set<string>([
-  JobStatus.APPLIED,
-  JobStatus.REJECTED,
-  JobStatus.PASSED,
-  JobStatus.ARCHIVED,
-]);
+import { isRecommendationTrackingEligible } from "./recommendation-eligibility";
 
 export function isHighFit(
   fitScore: number | null | undefined,
@@ -18,12 +11,13 @@ export function isApplyTodayJob(input: {
   fitScore: number | null | undefined;
   concerns: string | null | undefined;
   status: string | null | undefined;
+  appliedAt?: Date | string | null;
   suggestedAction: string | null | undefined;
   highFitThreshold: number;
 }) {
   const suggestedAction = input.suggestedAction ?? "";
   const status = input.status ?? "";
-  const canStillApply = !terminalApplyStatuses.has(status);
+  const canStillApply = isRecommendationTrackingEligible(status, input.appliedAt ?? null);
 
   if (/\bapply\s*today\b/iu.test(suggestedAction) && canStillApply) {
     return true;

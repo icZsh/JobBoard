@@ -4,6 +4,8 @@ import { formatDateOnly, formatSalary, formatTimestamp, getLocalDateKey } from "
 import { getCompanyWebsiteUrl } from "@/lib/jobs/company-website";
 import { parseJobDescriptionSections } from "@/lib/jobs/description";
 import { isApplyTodayJob } from "@/lib/jobs/prioritization";
+import { isRecommendationTrackingEligible, selectRecommendations } from "@/lib/jobs/recommendation-eligibility";
+import { findMatchingHistory } from "@/lib/jobs/recommendation-history";
 import {
   getFitTier,
   getSalarySortValue,
@@ -26,7 +28,6 @@ type TodayPageProps = {
   searchParams: TodaySearchParams;
 };
 
-const hiddenStatuses = new Set<string>([JobStatus.PASSED, JobStatus.ARCHIVED]);
 const RECENT_RUN_DAY_COUNT = 7;
 
 function getSingleParam(value: string | string[] | undefined) {
@@ -147,13 +148,22 @@ async function getRequestedSuccessfulRun(runId: string | undefined) {
   });
 }
 
-async function getRecommendationsForRun(runId: string) {
+async function getRecommendationsForRun(runId: string, runDate: Date) {
   return prisma.jobRecommendation.findMany({
     where: { importRunId: runId },
     include: {
       job: {
         include: {
           tracking: true,
+          recommendations: {
+            where: {
+              importRun: {
+                status: ImportRunStatus.SUCCESS,
+                runDate: { lt: runDate },
+              },
+            },
+            select: { importRun: { select: { runDate: true } } },
+          },
         },
       },
     },
@@ -161,14 +171,56 @@ async function getRecommendationsForRun(runId: string) {
   });
 }
 
+async function getListingHistory(runDate: Date) {
+  const jobs = await prisma.job.findMany({
+    select: {
+      id: true,
+      title: true,
+      company: true,
+      location: true,
+      sourceUrl: true,
+      tracking: { select: { status: true, appliedAt: true } },
+      recommendations: {
+        where: {
+          importRun: { status: ImportRunStatus.SUCCESS, runDate: { lt: runDate } },
+        },
+        select: { importRun: { select: { runDate: true } } },
+      },
+    },
+  });
+  return jobs.map((job) => ({ ...job, source_url: job.sourceUrl }));
+}
+
 type RecommendationWithJob = Awaited<
   ReturnType<typeof getRecommendationsForRun>
 >[number];
 
-function toTodayItem(recommendation: RecommendationWithJob): TodayJobItem {
+function toTodayItem(
+  recommendation: RecommendationWithJob,
+  listingHistory: Awaited<ReturnType<typeof getListingHistory>>,
+): TodayJobItem {
   const job = recommendation.job;
   const status = job.tracking?.status ?? JobStatus.NEW;
+  const aliases = findMatchingHistory({ ...job, source_url: job.sourceUrl }, listingHistory)
+    .matches.filter((match) => match.id !== job.id);
+  const previousRunDates = Array.from(new Set(
+    [job, ...aliases].flatMap((match) => match.recommendations.map((previous) => previous.importRun.runDate.toISOString())),
+  ));
   const descriptionSections = parseJobDescriptionSections(job.description);
+  const raw = recommendation.rawRecommendation;
+  const repeatReason = raw && typeof raw === "object" && !Array.isArray(raw) && typeof raw.repeat_reason === "string"
+    ? raw.repeat_reason.trim() || null
+    : null;
+  const rawEvidenceUrl = raw && typeof raw === "object" && !Array.isArray(raw) && typeof raw.repeat_evidence_url === "string"
+    ? raw.repeat_evidence_url
+    : null;
+  let repeatEvidenceUrl: string | null = null;
+  try {
+    const url = rawEvidenceUrl ? new URL(rawEvidenceUrl) : null;
+    if (url?.protocol === "https:") repeatEvidenceUrl = url.href;
+  } catch {
+    // Older raw recommendations may predate evidence validation.
+  }
 
   return {
     recommendationId: recommendation.id,
@@ -184,6 +236,16 @@ function toTodayItem(recommendation: RecommendationWithJob): TodayJobItem {
     salarySort: getSalarySortValue(job.salaryMin, job.salaryMax),
     sourceUrl: job.sourceUrl,
     status,
+    appliedAt: job.tracking?.appliedAt?.toISOString() ?? null,
+    previousRunDates,
+    blockedByRelatedTracking: aliases.some((match) => !isRecommendationTrackingEligible(
+      match.tracking?.status ?? JobStatus.NEW,
+      match.tracking?.appliedAt ?? null,
+    )),
+    repeatReason,
+    repeatEvidenceUrl,
+    isRepeat: previousRunDates.length > 0,
+    recommendationSuppressed: false,
     statusHue: statusHueByStatus[status],
     fitScore: recommendation.fitScore,
     fitTier: getFitTier(recommendation.fitScore),
@@ -205,10 +267,17 @@ function toTodayItem(recommendation: RecommendationWithJob): TodayJobItem {
 
 function sortInitialItems(items: TodayJobItem[], highFitThreshold: number) {
   return [...items].sort((left, right) => {
+    if (left.recommendationSuppressed !== right.recommendationSuppressed) {
+      return left.recommendationSuppressed ? 1 : -1;
+    }
+    if (left.isRepeat !== right.isRepeat) {
+      return left.isRepeat ? 1 : -1;
+    }
     const leftApply = isApplyTodayJob({
       fitScore: left.fitScore,
       concerns: left.concerns,
       status: left.status,
+      appliedAt: left.appliedAt,
       suggestedAction: left.suggestedAction,
       highFitThreshold,
     });
@@ -216,6 +285,7 @@ function sortInitialItems(items: TodayJobItem[], highFitThreshold: number) {
       fitScore: right.fitScore,
       concerns: right.concerns,
       status: right.status,
+      appliedAt: right.appliedAt,
       suggestedAction: right.suggestedAction,
       highFitThreshold,
     });
@@ -231,11 +301,12 @@ function sortInitialItems(items: TodayJobItem[], highFitThreshold: number) {
 function getApplyTodayCount(items: TodayJobItem[], highFitThreshold: number) {
   return items.filter(
     (item) =>
-      !hiddenStatuses.has(item.status) &&
+      !item.recommendationSuppressed &&
       isApplyTodayJob({
         fitScore: item.fitScore,
         concerns: item.concerns,
         status: item.status,
+        appliedAt: item.appliedAt,
         suggestedAction: item.suggestedAction,
         highFitThreshold,
       }),
@@ -297,6 +368,10 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     getHighFitThreshold(),
   ]);
   const selectedRun = requestedRun ?? latestSuccessfulRun;
+  const historicalReview = Boolean(
+    selectedRun && latestSuccessfulRun &&
+    getRunDateKey(selectedRun.runDate) < getRunDateKey(latestSuccessfulRun.runDate),
+  );
   const recentRuns = latestSuccessfulRun
     ? await getRecentSuccessfulRuns(latestSuccessfulRun.runDate)
     : [];
@@ -307,15 +382,26 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           latestRunOverall.runDate,
         )
       : null;
-  const recommendations = selectedRun
-    ? await getRecommendationsForRun(selectedRun.id)
-    : [];
+  const [recommendations, listingHistory] = selectedRun
+    ? await Promise.all([
+        getRecommendationsForRun(selectedRun.id, selectedRun.runDate),
+        getListingHistory(selectedRun.runDate),
+      ])
+    : [[], []];
+  const candidates = recommendations.map((recommendation) => toTodayItem(recommendation, listingHistory));
+  const selection = selectedRun && !historicalReview
+    ? selectRecommendations(candidates.filter((item) => !item.blockedByRelatedTracking), selectedRun.runDate)
+    : { eligible: candidates, suppressed: [] };
   const items = sortInitialItems(
-    recommendations.map(toTodayItem),
+    [
+      ...selection.eligible,
+      ...selection.suppressed.map((item) => ({ ...item, recommendationSuppressed: true })),
+      ...candidates.filter((item) => !historicalReview && item.blockedByRelatedTracking).map((item) => ({ ...item, recommendationSuppressed: true })),
+    ],
     highFitThreshold,
   );
   const totalRecommendations = items.length;
-  const applyTodayCount = getApplyTodayCount(items, highFitThreshold);
+  const applyTodayCount = historicalReview ? 0 : getApplyTodayCount(items, highFitThreshold);
   const runOptions = buildRunOptions({
     recentRuns,
     selectedRun,
@@ -340,9 +426,11 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
                     options={runOptions}
                     selectedRunId={selectedRun.id}
                   />
-                  <span className="paper-sub !mt-0">
-                    · <strong>{applyTodayCount} to apply today</strong>
-                  </span>
+                  {!historicalReview ? (
+                    <span className="paper-sub !mt-0">
+                      · <strong>{applyTodayCount} to apply today</strong>
+                    </span>
+                  ) : null}
                 </div>
               </>
             ) : (
@@ -387,17 +475,21 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
         ) : null}
 
         {selectedRun && totalRecommendations === 0 ? (
-          <EmptyState title="Latest run completed with no jobs">
+          <EmptyState title={historicalReview ? "No jobs were imported for this date" : "No new recommendations qualify"}>
+            <p>Your existing applications and saved jobs are still available on the Board.</p>
             <p>Run timestamp: {formatTimestamp(selectedRun.createdAt)}</p>
+            <Link className="paper-btn mt-4" href="/board">Open Board</Link>
           </EmptyState>
         ) : null}
 
-        {items.length > 0 ? (
+        {selectedRun && items.length > 0 ? (
           <TodayClient
             highFitThreshold={highFitThreshold}
             initialShowHidden={includeHidden}
             jobs={items}
-            key={selectedRun?.id}
+            key={selectedRun.id}
+            runDate={selectedRun.runDate.toISOString()}
+            historicalReview={historicalReview}
           />
         ) : null}
       </div>

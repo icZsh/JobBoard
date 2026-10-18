@@ -99,6 +99,18 @@ test("dedupes incoming jobs by URL first and fallback only when needed", () => {
   );
 });
 
+test("dedupes ATS aliases while preserving different requisitions", () => {
+  const jobs = [
+    "https://job-boards.greenhouse.io/acme/jobs/12345",
+    "https://careers.example.com/job?gh_jid=12345",
+    "https://job-boards.greenhouse.io/acme/jobs/12346",
+  ].map((sourceUrl) => ({
+    sourceUrl,
+    dedupe: buildDedupeInfo({ company: "Acme", title: "Engineer", location: "Remote", sourceUrl }),
+  }));
+  assert.deepEqual(dedupeIncomingJobs(jobs).map((job) => job.sourceUrl), [jobs[0].sourceUrl, jobs[2].sourceUrl]);
+});
+
 test("validates and normalizes import payload fields", () => {
   const parsed = importPayloadSchema.parse({
     run_date: "2026-05-30",
@@ -120,6 +132,26 @@ test("validates and normalizes import payload fields", () => {
   assert.equal(parsed.jobs[0].priority, "HIGH");
   assert.deepEqual(parsed.jobs[0].matched_skills, []);
   assert.deepEqual(parsed.jobs[0].missing_skills, []);
+});
+
+test("preserves optional repeat evidence and rejects unsafe evidence links", () => {
+  const job = {
+    title: "Data Engineer",
+    company: "ExampleCo",
+    repeat_reason: "Employer now confirms US remote eligibility.",
+    repeat_evidence_url: "https://example.com/careers/data-engineer",
+  };
+  const payload = { run_date: "2026-10-14", jobs: [job] };
+  const parsed = importPayloadSchema.parse(payload);
+  assert.equal(parsed.jobs[0].repeat_reason, job.repeat_reason);
+  assert.equal(parsed.jobs[0].repeat_evidence_url, job.repeat_evidence_url);
+  for (const url of ["javascript:alert(1)", "http://example.com/job", "not a URL"]) {
+    assert.equal(importPayloadSchema.safeParse({
+      ...payload,
+      jobs: [{ ...job, repeat_evidence_url: url }],
+    }).success, false);
+  }
+  assert.deepEqual(importPayloadSchema.parse({ ...payload, jobs: [] }).jobs, []);
 });
 
 test("previews invalid rows, payload duplicates, and existing matches", async () => {

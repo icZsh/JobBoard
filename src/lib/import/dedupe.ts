@@ -1,3 +1,5 @@
+import { getStablePostingId } from "./posting-identity";
+
 export type DedupeInfo = {
   normalizedSourceUrl: string | null;
   urlKey: string | null;
@@ -109,7 +111,8 @@ export function dedupeIncomingJobs<T extends { dedupe: DedupeInfo }>(
   const firstFallbackByKey = new Map<string, { hasUrl: boolean }>();
 
   for (const item of items) {
-    if (item.dedupe.urlKey && seenUrlKeys.has(item.dedupe.urlKey)) {
+    const postingKey = getStablePostingId(item.dedupe.normalizedSourceUrl) ?? item.dedupe.urlKey;
+    if (postingKey && seenUrlKeys.has(postingKey)) {
       continue;
     }
 
@@ -126,8 +129,8 @@ export function dedupeIncomingJobs<T extends { dedupe: DedupeInfo }>(
 
     kept.push(item);
 
-    if (item.dedupe.urlKey) {
-      seenUrlKeys.add(item.dedupe.urlKey);
+    if (postingKey) {
+      seenUrlKeys.add(postingKey);
     }
 
     if (!firstFallback) {

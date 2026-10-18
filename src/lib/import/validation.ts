@@ -80,6 +80,11 @@ export const importJobSchema = z.object({
   match_reason: nullableTrimmedString,
   concerns: nullableTrimmedString,
   suggested_action: nullableTrimmedString,
+  repeat_reason: nullableTrimmedString,
+  repeat_evidence_url: optionalHttpUrl.refine(
+    (value) => !value || value.startsWith("https://"),
+    { message: "Repeat evidence must use HTTPS" },
+  ),
 });
 
 export const importPayloadSchema = z.object({

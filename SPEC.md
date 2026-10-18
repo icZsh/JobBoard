@@ -381,14 +381,14 @@ The import service runs in **two persisted phases** so the raw payload is preser
    - URL key, if `source_url` exists: `url:<normalized_source_url>`
    - fallback key: `fallback:<normalized_company>|<normalized_title>|<normalized_location>`
 
-   Treat two rows in the same payload as duplicates when their URL keys match. If both rows have URL keys and they differ, keep both rows even if their fallback keys match; same company/title/location can represent distinct openings. If one or both rows lack a URL, use matching fallback keys as the duplicate signal. The first occurrence wins. If the payload contains the same job twice, only one `JobRecommendation` row should be created for it under this run.
+   Treat two rows in the same payload as duplicates when their normalized URL keys or recognized stable Greenhouse/Ashby requisition IDs match. If both rows have different posting identities, keep both rows even if their fallback keys match; same company/title/location can represent distinct openings. If one or both rows lack a URL, use matching fallback keys as the duplicate signal. The first occurrence wins. If the payload contains the same job twice, only one `JobRecommendation` row should be created for it under this run.
 8. For each unique incoming job:
    - Compute `normalized_source_url` (see URL Normalization).
    - Compute fallback dedupe key: `fallback:<normalized_company>|<normalized_title>|<normalized_location>`.
    - Store the fallback key in `fallback_dedupe_key` on every `Job` row.
    - If the incoming job has a URL, compute primary dedupe key: `url:<normalized_source_url>` and look up an existing `Job` by `dedupe_key`.
-   - If no URL-key match was found, search by `fallback_dedupe_key`. This fallback lookup runs even when the incoming job has a URL, because an earlier import may have inserted the same job before the URL was available.
-   - A fallback lookup is allowed to match only when it resolves to a single plausible existing job. If multiple existing URL-backed jobs share the same `fallback_dedupe_key` and none match the incoming URL key, treat the incoming row as a new job instead of guessing.
+   - If no URL-key match was found, look for an alias with the same recognized stable Greenhouse/Ashby requisition ID; compare parsed identities, not substring matches alone.
+   - If neither URL nor ATS ID matches, search by `fallback_dedupe_key`. A fallback match requires at least one side to lack a URL, and must resolve to a single plausible existing job. Different known posting identities stay separate, even with identical company/title/location; multiple fallback matches are not guessed.
    - **Backfill on link:** if the incoming job has a URL but matched an existing job that was originally inserted under the fallback key, update the existing row's `source_url`, `normalized_source_url`, and `dedupe_key` to the URL-based key. Keep `fallback_dedupe_key` unchanged.
    - Upsert the job: insert if no match (creating `JobTracking` in the same operation), update `last_imported_at` if matched.
    - Insert a `JobRecommendation` for `(jobId, importRunId)`. The `@@unique([jobId, importRunId])` constraint prevents accidental duplicates.
@@ -412,7 +412,7 @@ Apply, in order:
 - Remove trailing slash from the path unless the path is `/`.
 - Preserve all remaining path segments and query values verbatim — do not strip `www.`, since some hosts route `www` and apex to different content.
 
-URL normalization is a best-effort canonicalization. Some sites (LinkedIn, Greenhouse session URLs) embed transient IDs in the path; these will not collapse perfectly. The fallback dedup key exists for exactly this reason.
+URL normalization is a best-effort canonicalization. Stable Greenhouse requisition IDs (including `gh_jid` careers links) and Ashby UUIDs are also recognized across link variants. Unknown URL variants remain distinct; fallback matching cannot join two known, different URLs by title/location alone.
 
 ### Dedupe Keys
 
@@ -459,11 +459,19 @@ Selection behavior:
 - If the latest run overall is `SUCCESS`, use it for the job list.
 - If the latest run overall is `FAILED`, render the failure state and offer a link to the next-most-recent `SUCCESS` run if one exists.
 - The job list includes related jobs, recommendations, and tracking records.
-- The job list excludes tracking statuses `PASSED` and `ARCHIVED` by default.
+- The job list excludes any job with a non-null `applied_at`, or status `APPLYING`, `APPLIED`, `INTERVIEWING`, `OFFER`, `REJECTED`, `PASSED`, or `ARCHIVED`, by default. Tracking and Board records remain intact.
+- Determine prior recommendation history from all successful import runs whose calendar `run_date` precedes the selected run date. Failed runs, future runs, and same-day reimports do not count as prior appearances.
+- Aggregate eligibility evidence across recognized posting aliases (stable Greenhouse/Ashby posting IDs or normalized URL matches). Keep each original job and tracking row unchanged; a blocked tracking state on any matching alias suppresses the recommendation.
+- A repeated job is eligible when `fit_score >= 90`, priority is `HIGH`, raw `repeat_reason` is nonempty, and raw `repeat_evidence_url` is a valid HTTPS URL. The reason must explain why reconsideration is worthwhile; a currently verified, exceptionally close match in role, level, and technical stack is sufficient without a new posting change.
+- Select up to ten eligible jobs: new jobs ordered by descending fit first, then qualifying repeats ordered by descending fit and ascending latest earlier recommendation date as a tiebreaker. Seven days is a recency preference, not an exclusion. There is no fixed repeat count or percentage cap. Preserve all unselected recommendations for explicit history review.
+- Daily discovery must exhaust fresh suitable opportunities before filling the target with strong repeats. A shortage never overrides application/tracking exclusions or the evidence requirement.
+- Recompute selection after tracking changes so applying to a job removes it from the default list and allows the next eligible candidate into the shortlist.
+- When the selected run's calendar date is before the latest successful run date, pass `historicalReview = true` to Today as an internal display mode. Bypass current eligibility and the top-ten limit for that older date; show every original row with current tracking status. Present a plain dated list without a history banner, History badges, Historical review text, or Original suggested action wording. Omit Apply Today badges/filter/count and label source links View source. Keep tracking edits available and preserve stored runs, raw payloads, and recommendation rows unchanged.
 
 Controls:
 
-- Include Passed/Archived toggle.
+- Show hidden review toggle for all excluded recommendations; hidden records never receive an Apply Today badge.
+- Visible Repeat label, reason, and evidence link on eligible repeated recommendations.
 - Status quick actions.
 - Open the matching posting detail page from the job title in a new tab.
 - Open detail.
@@ -472,8 +480,8 @@ Empty / degenerate states:
 
 - **No imports yet:** render an empty state with a link to `/import` and a one-line explanation.
 - **Latest run is `FAILED`:** render the failure (with `error_message`) and a link to the next-most-recent `SUCCESS` run if one exists.
-- **Latest `SUCCESS` run had zero jobs:** render "Latest run completed with no jobs" plus the run timestamp.
-- **All jobs are `PASSED`/`ARCHIVED` and toggle is off:** render "All jobs in this run are hidden" with a one-click toggle.
+- **Latest `SUCCESS` run had zero jobs:** render "No new recommendations qualify" plus the run timestamp and a Board link.
+- **No recommendations qualify and Show hidden is off:** explain that no new recommendations qualify, link to the Board for existing applications, and retain the Show hidden review toggle.
 
 ### `run_date` semantics
 
@@ -513,6 +521,8 @@ Read-only fields:
 - Import history — list of all `JobRecommendation` rows for this job with their run dates.
 
 Status transitions are unrestricted: any status can move to any other status. The Board and Detail UIs should not constrain transitions — Isaac may need to correct mistakes (e.g. Applied → Interested). When status is changed to `APPLIED`, set `applied_at` to now if it is empty. Do not automatically clear `applied_at` if the status later changes away from `APPLIED`.
+
+The explicit Today Undo action restores both the previous status and the application date that existed before that quick action. Ordinary status changes continue to preserve an existing application date.
 
 ### `/import`
 
@@ -626,11 +636,11 @@ Default threshold:
 
 ### Apply Today Badge
 
-Show when **any** of:
+Show only for eligible recommendations with no saved application date and no status of `APPLYING`, `APPLIED`, `INTERVIEWING`, `OFFER`, `REJECTED`, `PASSED`, or `ARCHIVED`, when **any** of:
 
 - `suggested_action` matches `/\bapply\s*today\b/i`.
-- `suggested_action` matches `/\bapply\b/i` AND `tracking.status` is NOT one of `APPLIED`, `REJECTED`, `PASSED`, `ARCHIVED`.
-- `fit_score >= high_fit_threshold` AND `concerns` is null or empty AND `tracking.status` is NOT one of `APPLIED`, `REJECTED`, `PASSED`, `ARCHIVED`.
+- `suggested_action` matches `/\bapply\b/i`.
+- `fit_score >= high_fit_threshold` AND `concerns` is null or empty.
 
 "No major concerns" is operationalized as **`concerns` is null or empty string** — there is no severity field to interpret.
 
@@ -651,6 +661,14 @@ Strongly recommended job fields:
 - `suggested_action`
 
 Nullable fields should be accepted because job listings may be incomplete.
+
+`repeat_reason` and `repeat_evidence_url` are optional nullable fields persisted in raw recommendation JSON; supplied evidence URLs must use HTTPS. A nonempty reason and valid evidence URL are required for repeat eligibility, together with the fit and priority rules. Fresh jobs are selected first, then strong repeats fill the remaining places up to ten. `jobs: []` is valid at the API level.
+
+### Scheduled recommendation history handoff
+
+`scripts/recommendation-history.ts snapshot --output PATH` reads the existing local export and writes an atomic, private JSON snapshot containing only listing identities, tracking status/application date, and successful recommendation dates. It omits notes, resume fields, settings, and raw descriptions. `filter --history PATH --input PATH --output PATH` validates a snapshot no older than 24 hours and applies the shared policy offline. Missing, malformed, future-dated, or stale snapshots fail the command. Matching aliases contribute combined tracking/history; distinct known posting IDs never merge.
+
+The existing launchd daily importer refreshes history before checking whether today's file exists or is already imported. It validates, hashes, and filters an immutable copy of the daily source, then POSTs the filtered payload. The generator requests a refresh before searching, reads a snapshot generated during that run, and builds Markdown from the filtered JSON. A final import-time refresh catches applications made during the search. Scheduling remains unchanged.
 
 `salary_min` and `salary_max`, when present, are integers interpreted as **USD annual**. The daily automation is responsible for normalizing salary values into that shape. If a listing only has non-USD, hourly, monthly, equity-only, or unparseable salary data, those structured fields should be omitted or null; the original source value remains preserved only inside `raw_payload` / `raw_recommendation`. The validator does not enforce min <= max; just stores whatever the source emits.
 
@@ -702,7 +720,11 @@ Malformed JSON or requests missing the minimum envelope (`run_date` plus `jobs[]
 - Same job appearing twice in one payload creates exactly one `JobRecommendation` for that run.
 - Two payload rows with the same fallback key but different URL keys are kept as distinct jobs.
 - Phase-2 failure leaves an `import_runs` row with `status = FAILED`, `error_message` populated, and the original `raw_payload` intact.
-- Latest run query excludes Passed and Archived by default; toggle includes them.
+- Latest run query excludes applied/in-progress/closed tracking and repeats without a strong, evidenced signal; Show hidden includes them for review without Apply Today badges.
+- Same-day reimports do not create repeat history; older latest successful recommendations break ties between equally fitting repeats without a mandatory cooldown.
+- Repeats require fit >= 90, HIGH priority, a reason, and HTTPS evidence; they may fill every remaining slot up to the target of ten after fresh eligible roles.
+- First-time jobs outrank repeats, and the shortlist never exceeds ten. Applied or in-progress jobs never fill a shortage.
+- Older dates show original applied, closed, and repeated rows in plain dated lists without history labels or current Apply Today prompts; the latest date still enforces tracking exclusions.
 - Two `import_runs` on the same `run_date` are tiebroken by `created_at` (newest wins).
 - Tracking update endpoint changes status, sets `status_changed_at`, and updates notes.
 - Settings seed writes env-var defaults on first run; subsequent env changes do not overwrite existing settings rows.
@@ -716,7 +738,7 @@ Malformed JSON or requests missing the minimum envelope (`run_date` plus `jobs[]
 - Confirm status remains Interested.
 - Mark a job Passed.
 - Confirm it disappears from Today by default.
-- Toggle include Passed/Archived.
+- Toggle Show hidden.
 - Confirm Passed job appears.
 - Open source URL.
 - Edit notes and next action.
