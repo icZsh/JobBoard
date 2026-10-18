@@ -118,6 +118,10 @@ function isRemoteTypeInLocation(job: TodayJobItem) {
   );
 }
 
+function nonBlankText(value: string | null) {
+  return value?.trim() || null;
+}
+
 function BadgeCluster({
   job,
   highFitThreshold,
@@ -199,6 +203,31 @@ function DetailCopy({
   );
 }
 
+// Stacked on phones; on md+ the wrapper dissolves so labels share one grid column.
+function ExplanationLine({
+  label,
+  text,
+  isOpen,
+}: {
+  label: string;
+  text: string;
+  isOpen: boolean;
+}) {
+  return (
+    <div className="md:contents">
+      <dt className="paper-label">{label}</dt>
+      <dd
+        className={`mt-1 text-sm leading-6 text-[var(--ink-soft)] md:mt-0 ${
+          isOpen ? "" : "line-clamp-2"
+        }`}
+        title={isOpen ? undefined : text}
+      >
+        {text}
+      </dd>
+    </div>
+  );
+}
+
 function FitStat({ job }: { job: TodayJobItem }) {
   const score = job.fitScore ?? 0;
 
@@ -240,6 +269,15 @@ function TodayCard({
   const applyToday = isApplyTodayClient(job, highFitThreshold, historicalReview);
   const canTailorResume = canTailorResumeForStatus(job.status);
   const statusInMenu = quickActions.some((action) => action.status === job.status);
+  const repeatReason = job.isRepeat ? nonBlankText(job.repeatReason) : null;
+  const matchReason = nonBlankText(job.matchReason);
+  const concerns = nonBlankText(job.concerns);
+  const whyText = repeatReason ?? matchReason;
+  const whyLabel = repeatReason
+    ? historicalReview || job.recommendationSuppressed
+      ? "Repeat context"
+      : "Why this is worth another look"
+    : "Why it fits";
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
   const [tailorWarnings, setTailorWarnings] = useState<string[]>([]);
@@ -349,11 +387,15 @@ function TodayCard({
         <BadgeCluster highFitThreshold={highFitThreshold} historicalReview={historicalReview} job={job} />
       </div>
 
-      {job.isRepeat && job.repeatReason ? (
-        <div className="mt-4 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] p-4">
-          <p className="paper-label">{historicalReview || job.recommendationSuppressed ? "Repeat context" : "Why this is worth another look"}</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">{job.repeatReason}</p>
-        </div>
+      {whyText || concerns ? (
+        <dl className="mt-4 grid grid-cols-1 gap-y-2.5 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] px-4 py-3 md:grid-cols-[max-content_minmax(0,1fr)] md:items-baseline md:gap-x-5 md:gap-y-1.5">
+          {whyText ? (
+            <ExplanationLine isOpen={isOpen} label={whyLabel} text={whyText} />
+          ) : null}
+          {concerns ? (
+            <ExplanationLine isOpen={isOpen} label="Watch out" text={concerns} />
+          ) : null}
+        </dl>
       ) : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-x-12 gap-y-4 border-t border-[var(--hair)] pt-5">
@@ -399,23 +441,23 @@ function TodayCard({
               value={job.benefitsOverview}
             />
           </div>
+          {repeatReason && matchReason ? (
+            <div className="md:col-span-2">
+              <p className="paper-label">Why it fits</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+                {matchReason}
+              </p>
+            </div>
+          ) : null}
           <div>
-            <p className="paper-label">Match Reason</p>
-            <DetailCopy
-              fallback="No match reason provided."
-              value={job.matchReason}
-            />
-            <div className="mt-3">
+            <p className="paper-label">Matched skills</p>
+            <div className="mt-2">
               <SkillChips skills={job.matchedSkills} />
             </div>
           </div>
           <div>
-            <p className="paper-label">Concerns</p>
-            <DetailCopy
-              fallback="No major concerns."
-              value={job.concerns}
-            />
-            <div className="mt-3">
+            <p className="paper-label">Missing skills</p>
+            <div className="mt-2">
               <SkillChips missing skills={job.missingSkills} />
             </div>
           </div>

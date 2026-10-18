@@ -618,6 +618,10 @@ Required visible fields:
 - Fit score.
 - Priority, only when it isn't `HIGH`, labelled like "Medium priority" or "Low priority".
 - Status, for tracked jobs only; untracked (`NEW`) jobs show no status chip.
+- Why line: the repeat reason on a repeat that has one (the visible Repeat reason required under `/today`), labelled "Why this is worth another look", or "Repeat context" on hidden and older-date rows; otherwise `match_reason`, labelled "Why it fits".
+- Watch out line: `concerns`, when non-blank.
+
+The why and watch-out lines share one box below the header. Each is clamped to two lines, with its full text in a tooltip, until Details is open, which shows them in full. Details does not repeat either text: it shows `match_reason` only when the repeat reason holds the why line, alongside the matched- and missing-skill chips.
 
 Suggested action is not shown on the card: it is effectively "Apply today." or "Review today.", which the Apply Today badge already conveys. It still feeds the Apply Today rule and remains on Job Detail.
 
