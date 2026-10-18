@@ -1,47 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { TodayClient, type TodayJobItem } from "../src/app/today/today-client";
 import {
   isRecommendationTrackingEligible,
   selectRecommendations,
-  type RecommendationCandidate,
 } from "../src/lib/jobs/recommendation-eligibility";
 import { isApplyTodayJob } from "../src/lib/jobs/prioritization";
-
-const runDate = new Date("2026-10-14T00:00:00.000Z");
-
-function candidate(
-  jobId: string,
-  fields: Partial<RecommendationCandidate> = {},
-): RecommendationCandidate {
-  return {
-    jobId,
-    status: "NEW",
-    appliedAt: null,
-    fitScore: 90,
-    priority: "HIGH",
-    previousRunDates: [],
-    repeatReason: null,
-    repeatEvidenceUrl: null,
-    ...fields,
-  };
-}
-
-function repeated(jobId: string, fields: Partial<RecommendationCandidate> = {}) {
-  return candidate(jobId, {
-    fitScore: 92,
-    previousRunDates: ["2026-10-07"],
-    repeatReason: "The hiring manager confirmed this role now supports remote work.",
-    repeatEvidenceUrl: "https://example.com/jobs/updated-role",
-    ...fields,
-  });
-}
-
-function newJobs(count: number) {
-  return Array.from({ length: count }, (_, index) => candidate(`new-${index}`));
-}
+import { candidate, newJobs, renderToday, repeated, runDate, todayItem } from "./today-fixtures";
 
 test("excludes applications, in-progress and closed statuses even with strong recommendations", () => {
   const excludedStatuses = [
@@ -144,50 +108,6 @@ test("apply-today badges never bypass tracking or a saved application date", () 
   assert.equal(isApplyTodayJob({ status: "NEW", appliedAt: new Date(), fitScore: 100, concerns: null, suggestedAction: "Apply today", highFitThreshold: 80 }), false);
 });
 
-function todayItem(job: RecommendationCandidate): TodayJobItem {
-  return {
-    ...job,
-    appliedAt: job.appliedAt ? new Date(job.appliedAt).toISOString() : null,
-    previousRunDates: job.previousRunDates.map((date) => new Date(date).toISOString()),
-    recommendationId: `recommendation-${job.jobId}`,
-    title: `Role ${job.jobId}`,
-    company: "Example",
-    companyWebsiteUrl: null,
-    location: "San Francisco",
-    remoteType: null,
-    salary: null,
-    salarySort: 0,
-    sourceUrl: "https://example.com/jobs/role",
-    isRepeat: job.previousRunDates.length > 0,
-    recommendationSuppressed: false,
-    blockedByRelatedTracking: false,
-    statusHue: "100",
-    fitTier: "High fit",
-    priorityClass: "badge-neutral",
-    suggestedAction: "Apply today",
-    datePosted: "Unknown",
-    companyOverview: null,
-    benefitsOverview: null,
-    roleOverview: null,
-    matchReason: null,
-    concerns: null,
-    matchedSkills: [],
-    missingSkills: [],
-    resumePath: "",
-    resumeVersion: "",
-  };
-}
-
-function renderToday(jobs: TodayJobItem[], initialShowHidden = false, historicalReview = false) {
-  return renderToStaticMarkup(createElement(TodayClient, {
-    jobs,
-    initialShowHidden,
-    highFitThreshold: 80,
-    runDate: runDate.toISOString(),
-    historicalReview,
-  }));
-}
-
 test("Today excludes applied rows by default and explains how to find existing applications", () => {
   const job = todayItem(candidate("already-applied", { status: "APPLIED", appliedAt: "2026-10-10" }));
   const markup = renderToday([job]);
@@ -203,13 +123,33 @@ test("Today excludes applied rows by default and explains how to find existing a
   assert.ok(review.includes("View source"));
 });
 
-test("Today labels a qualified repeat and displays its reason and evidence after new jobs", () => {
+test("Today labels a qualified repeat and displays its reason after new jobs", () => {
   const repeat = todayItem(repeated("repeat"));
   const markup = renderToday([repeat, ...newJobs(3).map(todayItem)]);
   assert.ok(markup.indexOf("Role new-2") < markup.indexOf("Role repeat"));
   assert.match(markup, />Repeat</u);
   assert.ok(markup.includes(repeat.repeatReason!));
-  assert.ok(markup.includes(`href="${repeat.repeatEvidenceUrl}"`));
+  // Evidence gates eligibility only; the Apply link already opens the posting.
+  assert.ok(!markup.includes(repeat.repeatEvidenceUrl!));
+  assert.ok(!markup.includes("View supporting evidence"));
+});
+
+test("Today cards omit suggested action, untracked status, and repeated remote type", () => {
+  const fresh = { ...todayItem(candidate("fresh")), location: "United States; remote", remoteType: "remote" };
+  const interested = { ...todayItem(candidate("interested", { status: "INTERESTED" })), remoteType: "hybrid" };
+  const markup = renderToday([fresh, interested]);
+  assert.ok(markup.includes("Role fresh"));
+  assert.ok(!markup.includes("Suggested Action"));
+  assert.ok(!markup.includes(">New<"));
+  assert.equal(markup.match(/status-dot/gu)?.length, 1);
+  assert.ok(!markup.includes(" · remote<"));
+  assert.ok(markup.includes(" · hybrid<"));
+});
+
+test("Today omits the Show hidden toggle when nothing is hidden", () => {
+  const markup = renderToday(newJobs(3).map(todayItem));
+  assert.ok(markup.includes("Role new-0"));
+  assert.ok(!markup.includes("Show hidden"));
 });
 
 test("Today keeps qualifying repeats visible after tracking changes and respects blocked posting aliases", () => {

@@ -470,8 +470,8 @@ Selection behavior:
 
 Controls:
 
-- Show hidden review toggle for all excluded recommendations; hidden records never receive an Apply Today badge.
-- Visible Repeat label, reason, and evidence link on eligible repeated recommendations.
+- Show hidden review toggle for all excluded recommendations, rendered only while at least one recommendation is excluded (or the toggle is on); hidden records never receive an Apply Today badge.
+- Visible Repeat label and reason on eligible repeated recommendations. `repeat_evidence_url` gates eligibility but is not rendered as its own link, because it points at the same posting as the source listing link.
 - Status quick actions.
 - Open the matching posting detail page from the job title in a new tab.
 - Open detail.
@@ -606,12 +606,13 @@ Required visible fields:
 - Title.
 - Company.
 - Location.
-- Remote type.
+- Remote type, unless the location text already states it.
 - Salary range if available.
 - Fit score.
 - Priority.
-- Suggested action.
-- Status.
+- Status, for tracked jobs only; untracked (`NEW`) jobs show no status chip.
+
+Suggested action is not shown on the card: it is effectively "Apply today." or "Review today.", which the Apply Today badge already conveys. It still feeds the Apply Today rule and remains on Job Detail.
 
 Required actions:
 

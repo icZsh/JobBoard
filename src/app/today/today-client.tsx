@@ -93,6 +93,14 @@ function isHighFitClient(job: TodayJobItem, highFitThreshold: number) {
   return typeof job.fitScore === "number" && job.fitScore >= highFitThreshold;
 }
 
+// Imported locations often already say "remote" or "hybrid"; avoid repeating it.
+function isRemoteTypeInLocation(job: TodayJobItem) {
+  return Boolean(
+    job.remoteType &&
+      job.location?.toLowerCase().includes(job.remoteType.toLowerCase()),
+  );
+}
+
 function BadgeCluster({
   job,
   highFitThreshold,
@@ -276,9 +284,7 @@ function TodayCard({
                 {job.title}
               </Link>
             </h2>
-            {job.status === "NEW" ? (
-              <span className="paper-badge badge-neutral">New</span>
-            ) : (
+            {job.status !== "NEW" ? (
               <span className="paper-badge badge-neutral">
                 <span
                   className="status-dot"
@@ -286,7 +292,7 @@ function TodayCard({
                 />
                 {formatStatusLabel(job.status)}
               </span>
-            )}
+            ) : null}
           </div>
           <p className="mt-2 text-[14px] text-[var(--ink-soft)]">
             {job.companyWebsiteUrl ? (
@@ -307,7 +313,7 @@ function TodayCard({
             {job.location ? (
               <span className="text-[var(--ink-faint)]"> · {job.location}</span>
             ) : null}
-            {job.remoteType ? (
+            {job.remoteType && !isRemoteTypeInLocation(job) ? (
               <span className="text-[var(--ink-faint)]">
                 {" "}
                 · {job.remoteType}
@@ -327,22 +333,11 @@ function TodayCard({
         <div className="mt-4 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] p-4">
           <p className="paper-label">{historicalReview || job.recommendationSuppressed ? "Repeat context" : "Why this is worth another look"}</p>
           <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">{job.repeatReason}</p>
-          {job.repeatEvidenceUrl ? (
-            <a className="paper-link mt-2 inline-block text-sm" href={job.repeatEvidenceUrl} rel="noopener noreferrer" target="_blank">
-              View supporting evidence
-            </a>
-          ) : null}
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-4 border-t border-[var(--hair)] pt-5 md:grid-cols-[auto_1fr_1fr]">
+      <div className="mt-5 flex flex-wrap items-center gap-x-12 gap-y-4 border-t border-[var(--hair)] pt-5">
         <FitStat job={job} />
-        <div>
-          <p className="paper-label">Suggested Action</p>
-          <p className="mt-2 text-sm font-semibold text-[var(--ink)]">
-            {job.suggestedAction ?? "None"}
-          </p>
-        </div>
         <div>
           <p className="paper-label">Date Posted</p>
           <p className="mt-2 text-sm font-semibold text-[var(--ink)]">
@@ -772,7 +767,7 @@ export function TodayClient({
         </div>
       </div>
 
-      {!historicalReview ? <div className="mb-5">
+      {!historicalReview && (suppressedCount > 0 || showHidden) ? <div className="mb-5">
         <button
           className="paper-btn paper-btn-ghost"
           aria-pressed={showHidden}
