@@ -278,7 +278,7 @@ function TodayCard({
   const whyLabel = repeatReason
     ? historicalReview || job.recommendationSuppressed
       ? "Repeat context"
-      : "Why this is worth another look"
+      : "Why look again"
     : "Why it fits";
   const [tailoring, setTailoring] = useState(false);
   const [tailorError, setTailorError] = useState<string | null>(null);
@@ -397,7 +397,7 @@ function TodayCard({
       </header>
 
       {whyText || concerns ? (
-        <dl className="mt-4 grid grid-cols-1 gap-y-2.5 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] px-4 py-3 md:grid-cols-[max-content_minmax(0,1fr)] md:items-baseline md:gap-x-5 md:gap-y-1.5">
+        <dl className="mt-4 grid grid-cols-1 gap-y-2.5 rounded-[var(--radius-ctl)] border border-[var(--hair)] bg-[var(--surface-2)] px-4 py-3 md:grid-cols-[7rem_minmax(0,1fr)] md:items-baseline md:gap-x-5 md:gap-y-1.5">
           {whyText ? (
             <ExplanationLine isOpen={isOpen} label={whyLabel} text={whyText} />
           ) : null}

@@ -46,7 +46,7 @@ test("a repeat shows its repeat reason in the block and its match reason in Deta
   const markup = renderToday([repeat]);
   const block = explanationBlock(markup);
 
-  assert.ok(block.includes(">Why this is worth another look<"));
+  assert.ok(block.includes(">Why look again<"));
   assert.ok(block.includes(`>${repeat.repeatReason}<`));
   assert.ok(block.includes(`>${concerns}<`));
   assert.ok(!block.includes(matchReason));
@@ -90,7 +90,7 @@ test("a card with neither text renders no explanation block", () => {
   assert.ok(markup.includes("Role quiet"));
   assert.ok(markup.includes("Role quiet-repeat"));
   assert.deepEqual(explanationBlocks(markup), []);
-  for (const label of ["Why it fits", "Why this is worth another look", "Repeat context", "Watch out"]) {
+  for (const label of ["Why it fits", "Why look again", "Repeat context", "Watch out"]) {
     assert.ok(!markup.includes(label), label);
   }
 });
