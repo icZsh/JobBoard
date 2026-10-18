@@ -357,6 +357,13 @@ The same handler logic should be reusable for a JSON file import path.
 }
 ```
 
+### Field Notes
+
+- `location` names places only, such as `"New York, NY"` or `"San Francisco, CA / Sunnyvale, CA"`. A fully remote role uses a remote label such as `"Remote"` or `"Remote (US)"`, or its eligible country, such as `"United States"`. Otherwise `location` contains no commentary, source attributions ("JD says", "careers says"), office cadence, or work-arrangement words.
+- `remote_type` carries the work arrangement: exactly `remote`, `hybrid`, or `onsite`, or `null` when official sources do not state it.
+- Decision-relevant cadence (for example, "careers page says five office days despite hybrid label"), location discrepancies, and location-eligibility caveats belong in `concerns`, not `location`.
+- This is a producer contract. The importer stores `location` as sent (trimmed) and does not reject or rewrite it. Existing rows are not bulk-cleaned, because fallback matching depends on the stored location.
+
 ### Import Behavior
 
 The import service runs in **two persisted phases** so the raw payload is preserved for any parseable import request that has the minimum run envelope.
