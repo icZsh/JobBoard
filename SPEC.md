@@ -748,3 +748,16 @@ Malformed JSON or requests missing the minimum envelope (`run_date` plus `jobs[]
 - Sample JSON from the daily automation.
 - Resume file path.
 - Confirmation that the recommended stack is acceptable.
+
+
+## Official ATS discovery contract
+
+`scripts/discover-jobs.ts seed --history PATH --registry PATH` validates a fresh sanitized history snapshot and merges supported official employer board URLs into a registry without overriding existing disabled sources. `add-source --registry PATH --company NAME --url VERIFIED_ATS_URL` extends the registry after web discovery. Only fixed public ATS hosts can be fetched.
+
+`scan --history PATH --registry PATH --state-dir DIR --date YYYY-MM-DD [--force]` reads current history, fetches up to eight sources concurrently with bounded complete responses, and writes private local `pool.json`, `queue.json`, `report.json`, a dated report, readable `candidates.md`, and completion `status.json`. State files are versioned and JSON writes use atomic replacement. A process lock prevents simultaneous scans. A completed successful/partial scan is reused for up to 12 hours within the same local date and unchanged registry; cached runs still regenerate eligibility from current history without advancing source observation timestamps. Failed scans are retried on the next call.
+
+Pool identity uses the ATS provider and posting ID. First/last observation timestamps persist across runs, separately from provider publication data. Ashby `publishedAt` is last publication; Greenhouse `updated_at` is never used as original publication; Lever creation time, if provided, is labeled as such. Source content remains untrusted data. Only complete successful snapshots establish disappearance. Failed, disabled or removed sources cannot supply a fresh review candidate; their history is retained.
+
+Queue candidates and uncertainty holds are preliminary, not final eligibility or scored recommendations. The generator must evaluate current employer evidence, industry exclusions and the current resume, then use the existing recommendation-history filter and import schema. No discovery operation writes the application database or changes tracking. `--discover-only` on the existing importer refreshes history and discovery, then exits before any import; the ordinary handoff performs the same preparation before its existing missing/unchanged-file checks.
+
+Verification covers provider response shape, hidden postings, pagination/completeness, timeout/failure handling, incremental disappearance, first-seen persistence, geography/level uncertainty, applied aliases, stale history, cache refresh and current tracking changes.
