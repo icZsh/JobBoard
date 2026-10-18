@@ -100,8 +100,10 @@ test("Today cards no longer render per-status buttons", () => {
   const markup = renderToday(jobs, true);
 
   assert.equal(markup.split("<article").length - 1, jobs.length);
+  // The toolbar has its own "Interested" filter button; only the cards matter here.
+  const cards = markup.slice(markup.indexOf("<article"));
   for (const { text } of menuStatuses) {
-    assert.doesNotMatch(markup, new RegExp(`<button[^>]*>${text}</button>`, "u"));
+    assert.doesNotMatch(cards, new RegExp(`<button[^>]*>${text}</button>`, "u"));
   }
-  assert.ok(!markup.includes(">Archived</button>"));
+  assert.ok(!cards.includes(">Archived</button>"));
 });
