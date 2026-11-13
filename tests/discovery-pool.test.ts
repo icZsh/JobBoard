@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parsePool, updatePool } from "../src/lib/discovery/pool";
+import { containInvalidPostings, parsePool, updatePool } from "../src/lib/discovery/pool";
 import type { DiscoveryPosting, SourceScanResult } from "../src/lib/discovery/types";
 import type { RecommendationHistory, RecommendationHistoryJob } from "../src/lib/jobs/recommendation-history";
 
@@ -216,6 +216,29 @@ test("parsePool validates persisted data, versions, duplicate identities and tim
   assert.throws(() => parsePool({ ...result.pool, postings: [...result.pool.postings, result.pool.postings[0]] }), /duplicate/i);
   assert.throws(() => parsePool({ ...result.pool, postings: [{ ...result.pool.postings[0], last_seen_at: "not a date" }] }));
   assert.throws(() => parsePool({ ...result.pool, postings: [{ ...result.pool.postings[0], source_url: "javascript:bad()" }] }));
+});
+
+test("an invalid posting fails only its own board and names the posting and field without echoing provider values", () => {
+  const good = scan([posting()]);
+  const failed = scan([], { success: false, error: "timeout" });
+  assert.equal(containInvalidPostings(good), good);
+  assert.equal(containInvalidPostings(failed), failed);
+  const bad = containInvalidPostings(scan([posting("1"), posting("2", { title: "", source_url: "javascript:leak('private')" }), posting("3", { title: "" })]));
+  assert.deepEqual({ ...bad, error: undefined }, { source_id: "greenhouse:example", success: false, postings: [], total_count: 0, error: undefined });
+  assert.match(bad.error ?? "", /^Invalid posting greenhouse:2: title \(too_small\), source_url \(\w+\); 1 more invalid posting$/);
+  assert.doesNotMatch(bad.error ?? "", /leak|private/);
+  // A key that is not a safe provider identity is never printed; the posting is named by position.
+  const unnamed = containInvalidPostings(scan([posting("1", { key: "greenhouse:<script>", title: "" })]));
+  assert.match(unnamed.error ?? "", /^Invalid posting #1: title/);
+  assert.doesNotMatch(unnamed.error ?? "", /script/);
+  // A value the URL parser rejects is still reported as a field rather than thrown.
+  assert.match(containInvalidPostings(scan([posting("6", { source_url: "not a url" })])).error ?? "", /^Invalid posting greenhouse:6: source_url \(/);
+  // Contained like any failed board: prior postings become unverified, nothing new is merged.
+  const first = updatePool(null, [scan([posting("1")])], history(), now);
+  const later = new Date("2026-10-16T09:00:00.000Z");
+  const merged = updatePool(first.pool, [containInvalidPostings(scan([posting("1"), posting("4"), posting("5", { title: "" })]))], history([], later), later);
+  assert.deepEqual(merged.pool.postings.map((entry) => [entry.external_id, entry.availability]), [["1", "unverified"]]);
+  assert.equal(merged.metrics.failed_boards, 1);
 });
 
 test("inconsistent or duplicate successful source scans fail closed instead of marking omissions", () => {

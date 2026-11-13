@@ -109,7 +109,7 @@ function decodeEntities(value: string): string {
     return code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : " ";
   });
 }
-function plainText(value: string): string {
+function decodeLayers(value: string): string {
   // Greenhouse content can have multiple layers of HTML entity encoding.
   let decoded = value;
   for (let i = 0; i < 3; i++) {
@@ -117,9 +117,16 @@ function plainText(value: string): string {
     if (next === decoded) break;
     decoded = next;
   }
-  const spaced = decoded.replace(/<\/?(?:p|div|li|br|h[1-6]|section|ul|ol|table|tr)\b[^>]*>/gi, "\n");
+  return decoded;
+}
+function plainText(value: string): string {
+  const spaced = decodeLayers(value).replace(/<\/?(?:p|div|li|br|h[1-6]|section|ul|ol|table|tr)\b[^>]*>/gi, "\n");
   return decodeEntities(sanitizeHtml(spaced, { allowedTags: [], allowedAttributes: {} }))
     .replace(/[\t\r ]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+/** Titles are plain text in every supported ATS: a literal "<placeholder>" title keeps its words instead of sanitizing to nothing. */
+function titleText(value: string): string {
+  return plainText(value) || decodeLayers(value).replace(/[<>\s]+/gu, " ").trim();
 }
 function combine(values: Array<string | null | undefined>): string {
   return [...new Set(values.filter((v): v is string => Boolean(v?.trim())).map((v) => plainText(v!)))].filter(Boolean).join("; ");
@@ -144,7 +151,7 @@ function basePosting(source: DiscoverySource, id: string, title: string): Discov
       : `https://${leverHost}/${board}/${id}`;
   return {
     key: `${source.provider}:${id}`, source_id: source.id, provider: source.provider, external_id: id,
-    company: source.company, title: plainText(title), location: "", source_url: sourceUrl, description: "",
+    company: source.company, title: titleText(title), location: "", source_url: sourceUrl, description: "",
     employment_type: null, workplace_type: null, published_at: null, published_at_kind: "unknown",
   };
 }

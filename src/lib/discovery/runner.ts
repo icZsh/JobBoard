@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseRecommendationHistory } from "../jobs/recommendation-history";
 import { fetchSource, parseRegistry, sourceFromPostingUrl } from "./ats";
-import { parsePool, updatePool } from "./pool";
+import { containInvalidPostings, parsePool, updatePool } from "./pool";
 import type { DiscoveryRegistry, DiscoverySource, SourceScanResult } from "./types";
 
 export async function writeDiscoveryJson(path: string, value: unknown) {
@@ -147,7 +147,7 @@ export async function runDiscovery(options: RunOptions) {
       await Promise.all(Array.from({ length: Math.min(8, enabled.length) }, async () => {
         while (cursor < enabled.length) {
           const source = enabled[cursor++];
-          try { results.push(await sourceFetcher(source)); }
+          try { results.push(containInvalidPostings(await sourceFetcher(source))); }
           catch { results.push({ source_id: source.id, success: false, total_count: 0, postings: [], error: "Source request failed" }); }
         }
       }));
