@@ -52,6 +52,30 @@ test("a new local date scans again; failure is explicit and preserves posting hi
   } finally { await rm(f.dir, { recursive: true, force: true }); }
 });
 
+test("a board with an invalid posting fails alone: other boards merge and the failure names the board, posting and field", async () => {
+  const f = await fixture();
+  const other: DiscoverySource = { id: "ashby:acme", provider: "ashby", board: "acme", company: "Acme", enabled: true, evidence_url: "https://jobs.ashbyhq.com/acme" };
+  const acme = (id: string, title = "Data Engineer") => ({ ...posting, key: `ashby:${id}`, source_id: other.id, provider: "ashby" as const, external_id: id, company: "Acme", title, source_url: `https://jobs.ashbyhq.com/acme/${id}` });
+  const good: SourceScanResult = { source_id: source.id, success: true, postings: [posting], total_count: 1 };
+  try {
+    await writeFile(f.registryPath, JSON.stringify({ schema_version: 1, sources: [source, other] }));
+    await runDiscovery({ ...f, sourceFetcher: async (s) => s.id === source.id ? good : { source_id: other.id, success: true, postings: [acme("a1")], total_count: 1 } });
+    const later = new Date(now.getTime() + 60_000);
+    const result = await runDiscovery({ ...f, now: later, force: true, sourceFetcher: async (s) => s.id === source.id ? good
+      : { source_id: other.id, success: true, postings: [acme("a1"), acme("a2"), acme("bad", "")], total_count: 3 } });
+    assert.equal(result.report.status, "partial");
+    assert.equal(result.report.sources_succeeded, 1);
+    assert.deepEqual(result.report.sources.find((entry) => entry.source_id === other.id), { source_id: other.id, success: false, total_count: 0, error: "Invalid posting ashby:bad: title (too_small)" });
+    assert.equal(result.pool.postings.find((entry) => entry.key === posting.key)?.last_seen_at, later.toISOString());
+    assert.equal(result.pool.postings.find((entry) => entry.key === "ashby:a1")?.availability, "unverified");
+    assert.equal(result.pool.postings.some((entry) => entry.key === "ashby:a2"), false);
+    assert.deepEqual(result.queue.candidates.map((entry) => entry.key), [posting.key]);
+    assert.equal(JSON.parse(await readFile(join(f.stateDir, "status.json"), "utf8")).status, "complete");
+    assert.deepEqual(JSON.parse(await readFile(join(f.stateDir, "report.json"), "utf8")).sources, result.report.sources);
+    assert.match(await readFile(join(f.stateDir, "candidates.md"), "utf8"), /^- ashby:acme: Invalid posting ashby:bad: title \(too_small\)$/m);
+  } finally { await rm(f.dir, { recursive: true, force: true }); }
+});
+
 test("stale history blocks before network and cannot replace a good output", async () => {
   const f = await fixture();
   try {

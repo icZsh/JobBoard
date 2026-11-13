@@ -4,7 +4,8 @@ import type { DiscoveryPosting, SourceScanResult } from "./types";
 
 const dayMs = 24 * 60 * 60 * 1000;
 const timestamp = z.string().datetime();
-const httpsUrl = z.string().url().refine((value) => new URL(value).protocol === "https:", "Expected HTTPS source URL");
+// Zod still runs the refine after .url() fails, so it must not throw on unparseable text.
+const httpsUrl = z.string().url().refine((value) => URL.canParse(value) && new URL(value).protocol === "https:", "Expected HTTPS source URL");
 const postingSchema = z.object({
   key: z.string().min(1), source_id: z.string().min(1), provider: z.enum(["ashby", "greenhouse", "lever"]),
   external_id: z.string().min(1), company: z.string().min(1), title: z.string().min(1), location: z.string(),
@@ -68,6 +69,27 @@ export function parsePool(raw: unknown): DiscoveryPool {
     if (posting.first_seen_at > posting.last_seen_at || posting.last_seen_at > posting.last_checked_at) throw new Error("Pool posting timestamps are out of order");
   }
   return pool;
+}
+
+const SAFE_POSTING_KEY = /^(?:ashby|greenhouse|lever):[A-Za-z0-9][A-Za-z0-9_-]{0,149}$/u;
+
+/**
+ * One invalid posting fails only its own board (prior postings become unverified), never the whole scan.
+ * The error names the posting key and failing fields only; provider values are never echoed.
+ */
+export function containInvalidPostings(result: SourceScanResult): SourceScanResult {
+  if (!result.success || !Array.isArray(result.postings)) return result;
+  const invalid = result.postings.flatMap((posting, index) => {
+    const parsed = postingSchema.safeParse(posting);
+    return parsed.success ? [] : [{ posting: posting as { key?: unknown } | null, index, issues: parsed.error.issues }];
+  });
+  if (!invalid.length) return result;
+  const [{ posting, index, issues }] = invalid;
+  const key = posting?.key;
+  const label = typeof key === "string" && SAFE_POSTING_KEY.test(key) ? key : `#${index + 1}`;
+  const fields = [...new Set(issues.map((issue) => `${issue.path.map(String).join(".") || "posting"} (${issue.code})`))].join(", ");
+  const more = invalid.length > 1 ? `; ${invalid.length - 1} more invalid posting${invalid.length > 2 ? "s" : ""}` : "";
+  return { source_id: result.source_id, success: false, postings: [], total_count: 0, error: `Invalid posting ${label}: ${fields}${more}`.slice(0, 240) };
 }
 
 function isRelevant(posting: DiscoveryPosting) {

@@ -70,6 +70,19 @@ test("Ashby retains location countries, labels last publication and excludes unl
   assert.match(rows[0].location, /USA/);
 });
 
+test("a title that is only an angle-bracket placeholder keeps its text instead of sanitizing to empty", async () => {
+  // Real Ashby posting (ashby:composio, 2026-11-12): sanitizing alone turned this title into "" and aborted the whole scan.
+  const placeholderId = "9cf4a64b-65a2-49ba-ae33-826e1d13cc63";
+  const placeholder = { ...ashbyJob, title: "<insert your dream job here> ", jobUrl: `https://jobs.ashbyhq.com/Acme/${placeholderId}` };
+  const result = await fetchSource(ashby, { fetcher: jsonFetch({ apiVersion: "1", jobs: [ashbyJob, placeholder] }) });
+  assert.equal(result.success, true);
+  assert.equal(result.total_count, 2);
+  assert.equal(result.postings.find((row) => row.external_id === placeholderId)?.title, "insert your dream job here");
+  assert.equal(parsePostings(greenhouse, { jobs: [{ ...greenhouseJob, title: "&lt;Data Engineer&gt;" }], meta: { total: 1 } })[0].title, "Data Engineer");
+  assert.equal(parsePostings(lever, [{ ...leverJob, text: "<Data Engineer>" }])[0].title, "Data Engineer");
+  assert.equal(parsePostings(lever, [{ ...leverJob, text: "Data Engineer <b>II</b>" }])[0].title, "Data Engineer II");
+});
+
 test("Ashby posting URL must identify the expected board even if API supplies an id", () => {
   assert.throws(() => parsePostings(ashby, { apiVersion: "1", jobs: [{ ...ashbyJob, id: postingId, jobUrl: "https://evil.test/Acme/id" }] }));
   assert.throws(() => parsePostings(ashby, { apiVersion: "1", jobs: [{ ...ashbyJob, jobUrl: `https://jobs.ashbyhq.com/other/${postingId}` }] }));
